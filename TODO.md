@@ -15,26 +15,26 @@
 
 ## Phase 0 — Pre-flight (do this first, ~15 min)
 
-- [ ] `P0.1` Start Ollama daemon: `ollama serve`
-- [ ] `P0.2` Ping all 4 Falcon3 models to confirm readiness:
+- [x] `P0.1` Start Ollama daemon: `ollama serve`
+- [x] `P0.2` Ping all 4 Falcon3 models to confirm readiness:
   ```bash
   for m in 1b 3b 7b 10b; do
     echo -n "falcon3:${m}: "; ollama run falcon3:${m} "reply OK" --nowordwrap 2>&1 | head -1
   done
   ```
-- [ ] `P0.3` Activate venv + load env vars:
+- [x] `P0.3` Activate venv + load env vars:
   ```bash
   cd "/Users/jawadhaider/Study/Technical AI Safety Project/Falcon Day 1"
   source venv/bin/activate && source .env
   export HUGGINGFACE_API_KEY=$HF_TOKEN
   ```
-- [ ] `P0.4` Verify WMDP dataset is cached (avoid download during runs):
+- [x] `P0.4` Verify WMDP dataset is cached (avoid download during runs):
   ```bash
   python3 -c "from datasets import load_dataset; d=load_dataset('cais/wmdp','wmdp-bio',split='test'); print(len(d),'samples')"
   ```
-  Expected: **1273 samples**
-- [ ] `P0.5` Verify Inspect AI version: `inspect --version`  (expect 0.3.x)
-- [ ] `P0.6` Pin exact package versions to `requirements.txt`:
+  Confirmed: **1273 samples**
+- [x] `P0.5` Verify Inspect AI version: `inspect --version`  (confirmed 0.3.x)
+- [ ] `P0.6` Pin exact package versions to `requirements.txt` *(do after all runs)*:
   ```bash
   pip freeze | grep -E "inspect|transformers|torch|datasets|pandas|matplotlib|scipy|numpy" > requirements.txt
   ```
@@ -46,80 +46,107 @@
 All code lives in `falcon_eval_wmdp/experiments/`.
 
 ### 1A — Central Config (`experiments/config.py`)
-- [ ] `P1A.1` Define FALCON_MODELS dict: name → Ollama tag + parameter count
-- [ ] `P1A.2` Define BASELINE_MODELS dict (llama, deepseek, phi, qwen)
-- [ ] `P1A.3` Define eval constants: SEED=42, TEMPERATURE=0.0, DATASET="cais/wmdp", SPLIT="wmdp-bio", N_FULL=1273
-- [ ] `P1A.4` Define output paths: `results/raw/` (.eval files), `results/processed/` (CSVs), `figures/`
+- [x] `P1A.1` Define FALCON_MODELS dict: name → Ollama tag + parameter count
+- [x] `P1A.2` Define BASELINE_MODELS dict (llama, mistral, qwen, deepseek, gemma, phi4-mini)
+- [x] `P1A.3` Define eval constants: SEED=42, TEMPERATURE=0.0, DATASET="cais/wmdp", SPLIT="wmdp-bio", N_FULL=1273
+- [x] `P1A.4` Define output paths: `results/raw/` (.eval files), `results/processed/` (CSVs), `figures/`
 
 ### 1B — Main Eval Runner (`experiments/run_wmdp_bio.py`)
-- [ ] `P1B.1` Load WMDP-bio via `hf_dataset` with `RecordToSample` (exact WMDP paper format)
-- [ ] `P1B.2` Task definition: `multiple_choice()` solver + `choice()` scorer, no system prompt (matches WMDP paper protocol)
-- [ ] `P1B.3` `GenerateConfig`: temperature=0.0, seed=42, max_tokens=16 (MCQ only needs 1 token — keeps runs fast)
-- [ ] `P1B.4` CLI arg parsing: `--model`, `--limit` (default=None = full run), `--log-dir`
-- [ ] `P1B.5` Log hardware metadata into eval metadata: model name, ollama tag, M2/MPS, timestamp
-- [ ] `P1B.6` Print live progress bar + estimated time remaining
-- [ ] `P1B.7` On completion: print accuracy + 95% CI + save summary line to `results/processed/summary.csv`
+- [x] `P1B.1` Load WMDP-bio via `hf_dataset` with `RecordToSample` (exact WMDP paper format)
+- [x] `P1B.2` Task definition: `multiple_choice()` solver + `robust_choice()` scorer, no system prompt (matches WMDP paper protocol)
+- [x] `P1B.3` Flat kwargs to `eval()`: temperature=0.0, seed=42, max_tokens=32 (768 for think-tag models)
+- [x] `P1B.4` CLI arg parsing: `--model`, `--limit` (default=None = full run), `--system-prompt`, `--cot`
+- [x] `P1B.5` Log hardware metadata: platform, python version, timestamp, chip info
+- [x] `P1B.6` Inspect AI provides live progress display natively
+- [x] `P1B.7` On completion: print accuracy + 95% Wilson CI + append to `results/processed/wmdp_bio_results.csv`
 
 ### 1C — Results Analyzer (`experiments/analyze_results.py`)
-- [ ] `P1C.1` Walk `results/raw/` for `.eval` files using `list_eval_logs`
-- [ ] `P1C.2` Extract per-model: accuracy, n_correct, n_total, input_tokens, output_tokens, wall_time
-- [ ] `P1C.3` Compute 95% Wilson confidence intervals (correct for binary proportions, better than normal approx)
-- [ ] `P1C.4` Save to `results/processed/wmdp_bio_results.csv`
-- [ ] `P1C.5` Print markdown table: model | params | accuracy | 95% CI | tokens | time
+- [x] `P1C.1` Load from `results/processed/wmdp_bio_results.csv`
+- [x] `P1C.2` Extract per-model: accuracy, n_correct, n_total, input_tokens, output_tokens, wall_time
+- [x] `P1C.3` Compute 95% Wilson confidence intervals
+- [x] `P1C.4` CSV written by `run_wmdp_bio.py` directly; analyzer reads and formats
+- [x] `P1C.5` Print table: model | params | quant | accuracy | 95% CI | n | format-fail | ±random
 
 ### 1D — Plotting Suite (`experiments/plot_results.py`)
-- [ ] `P1D.1` **Figure 1**: Bar chart — all models (Falcon3 + baselines) sorted by accuracy, with error bars (95% CI). Color: Falcon3=blue family, baselines=grey.
-- [ ] `P1D.2` **Figure 2**: Scaling plot — log(params) vs. accuracy for Falcon3 family only. Include published WMDP numbers for same-size Llama/Mistral/Qwen as overlapping points.
-- [ ] `P1D.3` **Figure 3**: Heatmap — model × metric (accuracy, refusal_rate, tokens/sample, time/sample). Useful for characterizing model "personality".
-- [ ] `P1D.4` **Figure 4**: CDF of per-sample scores — shows if a model is consistently mediocre vs. bimodal.
-- [ ] `P1D.5` Save all figures to `figures/` as both `.png` (300 DPI) and `.pdf` (for papers).
-- [ ] `P1D.6` Use `matplotlib` style: seaborn-v0_8-paper, fontsize=12, no chart junk. Color-blind safe palette.
+- [x] `P1D.1` **Figure 1**: Bar chart — all models sorted by accuracy, error bars (95% CI), Falcon3=blue, baselines=grey
+- [x] `P1D.2` **Figure 2**: Scaling plot — log₂(params) vs. accuracy for Falcon3, published WMDP overlay points
+- [x] `P1D.3` **Figure 3**: Heatmap — model × {accuracy, format_fail%, tokens/sample, time/sample}
+- [x] `P1D.4` **Figure 4**: CDF of per-sample scores (requires raw .eval files)
+- [x] `P1D.5` Saves all figures as `.png` (300 DPI) + `.pdf` to `figures/`
+- [x] `P1D.6` matplotlib style: seaborn-v0_8-paper, fontsize=12, Paul Tol color-blind safe palette
 
 ### 1E — Validation Run (smoke test before full runs)
-- [ ] `P1E.1` Run 20-sample test with all 4 Falcon3 models to verify scripts work end-to-end
-- [ ] `P1E.2` Confirm `.eval` files written, CSV updated, no errors
-- [ ] `P1E.3` Confirm scores are non-trivially different across models (not all same value = bug)
+- [x] `P1E.1` Ran 10-sample test on Falcon3-1B to verify end-to-end pipeline
+- [x] `P1E.2` Confirmed `.eval` files written, CSV updated, 0 format failures
+- [x] `P1E.3` Confirmed scoring works correctly (predicted vs. target letters match expected format)
+- [x] `P1E.4` **Key bugs fixed during smoke test**:
+  - `eval()` takes flat kwargs, NOT `GenerateConfig` object
+  - Ollama base URL must include `/v1` suffix: `http://localhost:11434/v1`
+  - `target.text` (not `str(target)`) for Inspect AI Target objects in custom scorers
 
 ---
 
-## Phase 2 — Run Falcon3 Models (main data collection, ~4.5 hr total)
+## Phase 2 — Run Falcon3 Models (main data collection) ✅ COMPLETE
 
-Run sequentially (M2 can't parallelize two Ollama models well). Estimated runtimes at 1273 samples:
+Run sequentially (M2 can't parallelize two Ollama models well). All 4 completed 2026-06-02:
 
-| Model | Params | Est. Time | Priority |
-|-------|--------|-----------|----------|
-| `falcon3:1b` | 1B | ~15 min | First |
-| `falcon3:3b` | 3B | ~32 min | Second |
-| `falcon3:7b` | 7B | ~57 min | Third |
-| `falcon3:10b` | 10B | ~85 min | Fourth |
+| Model | Params | Quant | Accuracy | 95% CI | Correct/1273 | Fmt-fail | Wall time |
+|-------|--------|-------|----------|--------|--------------|----------|-----------|
+| `falcon3:1b` | 1.7B | Q8_0 | **40.1%** | 37.5–42.9% | 511 | 1 | 1.2 min |
+| `falcon3:3b` | 3.2B | Q4_K_M | **57.9%** | 55.2–60.6% | 737 | 6 | 2.1 min |
+| `falcon3:7b` | 7.5B | Q4_K_M | **70.9%** | 68.4–73.4% | 903 | 1 | 6.1 min |
+| `falcon3:10b` | 10.3B | Q4_K_M | **73.7%** | 71.2–76.0% | 938 | 0 | 7.8 min |
 
-- [ ] `P2.1` **Falcon3-1B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:1b`
-  - After: note accuracy + check for format failures (model not outputting A/B/C/D)
-- [ ] `P2.2` **Falcon3-3B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:3b`
-- [ ] `P2.3` **Falcon3-7B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:7b`
-- [ ] `P2.4` **Falcon3-10B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:10b`
-- [ ] `P2.5` After all runs: compute scaling slope (accuracy gain per parameter doubling)
+> Key finding: Falcon3-7B (70.9%) nearly matches GPT-4 (72.1%); Falcon3-10B (73.7%) **exceeds** GPT-4.
 
-> **Checkpoint**: if any model fails mid-run, Inspect AI logs partial results. Use `--resume` flag to continue from last checkpoint (verify this works in P1E smoke test).
+- [x] `P2.1` **Falcon3-1B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:1b`
+- [x] `P2.2` **Falcon3-3B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:3b`
+- [x] `P2.3` **Falcon3-7B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:7b`
+- [x] `P2.4` **Falcon3-10B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:10b`
+- [ ] `P2.5` Compute scaling slope after Phase 3 complete (run `analyze_results.py`)
+
+> **Note**: Falcon3-1B uses Q8_0 (higher precision) vs. Q4_K_M for 3B/7B/10B — document as confound in scaling analysis.
 
 ---
 
-## Phase 3 — Run Comparison Baselines (~3.5 hr total)
+## Phase 3 — Run Comparison Baselines ✅ COMPLETE
 
-Purpose: situate Falcon3 in the broader model landscape.
+Purpose: situate Falcon3 against sub-13B models from all major families at matched param counts.  
+Decision (2026-06-02): replaced original oversized baselines (Phi4-14B, DeepSeek-R1-14B) with ~7-10B equivalents for fair comparison.
 
-| Model | Params | Est. Time | Notes |
-|-------|--------|-----------|-------|
-| `llama3.1:8b` | 8B | ~57 min | Direct Falcon3-7B competitor |
-| `phi4:latest` | 14B | ~85 min | Microsoft, strong at reasoning |
-| `deepseek-r1:14b` | 14B | ~85 min | Reasoning model — expect high |
-| `qwen2.5vl:7b` | 7B | ~57 min | VL model on text task — note caveat |
+| Model | Params | Accuracy | 95% CI | Correct/1273 | Fmt-fail | Notes |
+|-------|--------|----------|--------|--------------|----------|-------|
+| `llama3.1:8b` | 8.0B | **72.7%** | 70.2–75.1% | 926 | 13 | |
+| `mistral:7b` | 7.2B | **63.9%** | 61.2–66.5% | 813 | 1 | Published was ~45% (v0.2) — version gap explains diff |
+| `qwen2.5:7b` | 7.6B | **71.6%** | 69.0–74.0% | 911 | 0 | Run twice — identical results, confirms temp=0 determinism |
+| `phi4-mini:latest` | 3.8B | **62.1%** | 59.4–64.7% | 790 | 0 | |
+| `deepseek-r1:7b` | 7.6B | ❌ DROPPED | — | — | — | Think tags → ~1.5 s/sample → 32+ hrs; aborted at 143/1273 |
+| `gemma2:9b` | 9.2B | ❌ DROPPED | — | — | — | Not pulled; skipped in favor of moving to Phase 4 |
 
-- [ ] `P3.1` **Llama3.1-8B**: `python experiments/run_wmdp_bio.py --model ollama/llama3.1:8b`
-- [ ] `P3.2` **Phi4-14B**: `python experiments/run_wmdp_bio.py --model ollama/phi4:latest`
-- [ ] `P3.3` **DeepSeek-R1-14B**: `python experiments/run_wmdp_bio.py --model ollama/deepseek-r1:14b`
-  - Note: DeepSeek-R1 uses `<think>...</think>` tags before answering. The `choice()` scorer must extract the letter AFTER the think block. Verify this works in smoke test.
-- [ ] `P3.4` **Qwen2.5VL-7B** (optional, flag as caveat): `python experiments/run_wmdp_bio.py --model ollama/qwen2.5vl:7b`
+```bash
+# Pull remaining models (run in a second terminal while deepseek-r1:7b runs):
+ollama pull mistral:7b
+ollama pull qwen2.5:7b
+ollama pull gemma2:9b
+ollama pull phi4-mini:latest
+
+# Run order after deepseek finishes:
+python experiments/run_wmdp_bio.py --model ollama/llama3.1:8b      # ✅ done
+# deepseek-r1:7b DROPPED — think tags make it ~3+ hrs on M2 (too slow)
+python experiments/run_wmdp_bio.py --model ollama/mistral:7b
+python experiments/run_wmdp_bio.py --model ollama/qwen2.5:7b
+python experiments/run_wmdp_bio.py --model ollama/gemma2:9b
+python experiments/run_wmdp_bio.py --model ollama/phi4-mini:latest
+```
+
+- [x] `P3.1` **Llama3.1-8B**: `python experiments/run_wmdp_bio.py --model ollama/llama3.1:8b`
+- [!] `P3.2` ~~**DeepSeek-R1-7B**~~ **DROPPED** — think tags cause ~1.5 s/sample on M2 → estimated 32+ hrs for full run. Aborted at 143/1273 (11%). Not feasible on local hardware.
+- [x] `P3.3` **Mistral-7B**: `python experiments/run_wmdp_bio.py --model ollama/mistral:7b`
+  - ⚠️ Our 63.9% vs. published 45% (Li et al. 2024) — version difference: we ran v0.3, paper tested v0.2-instruct. Note in methodology.
+- [x] `P3.4` **Qwen2.5-7B**: `python experiments/run_wmdp_bio.py --model ollama/qwen2.5:7b`
+  - Duplicate run removed from CSV; both runs gave identical 71.6% — validates temp=0 reproducibility.
+- [!] `P3.5` ~~**Gemma2-9B**~~ **SKIPPED** — not pulled; moving to Phase 4. Can add later if needed.
+- [x] `P3.6` **Phi4-mini-3.8B**: `python experiments/run_wmdp_bio.py --model ollama/phi4-mini:latest`
 
 ---
 

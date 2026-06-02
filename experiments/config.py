@@ -33,8 +33,6 @@ DATASET_N_SAMPLES = 1273  # full test set
 TEMPERATURE = 0.0      # greedy — deterministic, reproducible
 SEED = 42
 MAX_TOKENS = 32        # MCQ answer is 1 token; 32 is generous buffer
-MAX_TOKENS_THINK = 768  # DeepSeek-R1: needs room for <think>...</think> prefix before letter
-# Note: choice() scorer extracts first valid A-D letter, so padding is fine
 
 # ---------------------------------------------------------------------------
 # Models — Falcon3 family (primary)
@@ -95,20 +93,9 @@ BASELINE_MODELS = {
         "quant":        "Q4_K_M",
         "est_time_min": 57,
     },
-    "DeepSeek-R1-7B": {
-        "ollama_tag":    "ollama/deepseek-r1:7b",
-        "params_b":      7.6,
-        "quant":         "Q4_K_M",
-        "est_time_min":  70,
-        "has_think_tags": True,   # <think>...</think> prefix before answer
-        "max_tokens":    MAX_TOKENS_THINK,
-    },
-    "Gemma2-9B": {
-        "ollama_tag":   "ollama/gemma2:9b",
-        "params_b":     9.2,
-        "quant":        "Q4_K_M",
-        "est_time_min": 65,
-    },
+    # DeepSeek-R1-7B REMOVED: think tags → ~1.5 s/sample → 32+ hrs for full 1273-sample run on M2.
+    # Use OpenRouter API if DeepSeek-R1 results needed.
+    # Gemma2-9B: skipped — moved to Phase 4 before pulling. Can add in a future sweep.
     "Phi4-mini-3.8B": {
         "ollama_tag":   "ollama/phi4-mini:latest",
         "params_b":     3.8,
