@@ -97,7 +97,7 @@ Run sequentially (M2 can't parallelize two Ollama models well). All 4 completed 
 | `falcon3:7b` | 7.5B | Q4_K_M | **70.9%** | 68.4–73.4% | 903 | 1 | 6.1 min |
 | `falcon3:10b` | 10.3B | Q4_K_M | **73.7%** | 71.2–76.0% | 938 | 0 | 7.8 min |
 
-> Key finding: Falcon3-7B (70.9%) nearly matches GPT-4 (72.1%); Falcon3-10B (73.7%) **exceeds** GPT-4.
+> ⚠️ CORRECTED (Phase 5): GPT-4 published score is **82.2%** (logprob eval, Li et al. 2024) — NOT 72.1%. The 72.1% figure was unverified. See `results/LITERATURE_COMPARISON.md` for full analysis. Direct comparison is also confounded by eval protocol (logprob vs. text-gen). Updated claim: Falcon3-10B (73.7%) approaches Mixtral-8x7B (74.8%) at ~4.5× fewer parameters.
 
 - [x] `P2.1` **Falcon3-1B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:1b`
 - [x] `P2.2` **Falcon3-3B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:3b`
@@ -150,45 +150,56 @@ python experiments/run_wmdp_bio.py --model ollama/phi4-mini:latest
 
 ---
 
-## Phase 4 — Ablation Experiments (1 hr, do after all main runs)
+## Phase 4 — Ablation Experiments ✅ COMPLETE (CoT result pending)
 
 These add scientific depth and distinguish the work from a simple benchmark run.
 
-- [ ] `P4.1` **System prompt ablation** (Falcon3-7B only, 1273 samples):
-  - Condition A: no system prompt (baseline, already done in Phase 2)
-  - Condition B: WMDP paper system prompt ("You are a helpful assistant.")
-  - Condition C: biosecurity refusal prompt ("You are a biosecurity researcher. Refuse to provide weaponization details.")
-  - Hypothesis: refusal prompt may suppress biosecurity knowledge → lower accuracy
-- [ ] `P4.2` **Chain-of-thought ablation** (Falcon3-7B only, n=200 subset):
-  - Condition A: `multiple_choice()` — direct answer (baseline)
-  - Condition B: `chain_of_thought()` + `multiple_choice()` — CoT before answer
-  - Measure: accuracy delta, token cost delta
-- [ ] `P4.3` **Answer format robustness** (Falcon3-7B, n=100):
-  - Does the model output valid A/B/C/D reliably? Log format failure rate.
-  - If format failures > 5%: implement regex fallback extractor
+| Condition | Accuracy | 95% CI | Fmt-fail | vs baseline |
+|-----------|----------|--------|----------|-------------|
+| Falcon3-7B baseline (none, no CoT) | 70.9% | 68.4–73.4% | 1 (0.1%) | — |
+| Helpful system prompt | 71.2% | 68.6–73.6% | 3 (0.2%) | +0.3pp (not significant) |
+| Biosec system prompt | 70.5% | 67.9–72.9% | 5 (0.4%) | −0.4pp (not significant) |
+| CoT max_tokens=32 | 29.4% | 26.9–31.9% | 250 (19.6%) | ❌ INVALID — see note |
+| CoT max_tokens=512 | **PENDING** | — | — | rerun in progress |
+
+- [x] `P4.1` **System prompt ablation** (Falcon3-7B only, 1273 samples):
+  - Condition A: no system prompt (baseline, already done in Phase 2) — 70.9%
+  - Condition B: "You are a helpful assistant." — **71.2%** (+0.3pp, within CI)
+  - Condition C: biosecurity refusal prompt — **70.5%** (−0.4pp, within CI)
+  - Result: **null result** — system prompts have no statistically significant effect.
+  - The biosecurity suppression hypothesis is not supported.
+- [~] `P4.2` **Chain-of-thought ablation** (Falcon3-7B, full 1273):
+  - Condition A: baseline — 70.9%
+  - Condition B (max_tokens=32): **INVALID** — 19.6% format failures; model reasoned past token limit, never output A–D. Not a real CoT measurement.
+  - Condition B (max_tokens=512): **rerun in progress** — result TBD.
+  - ⚠️ Note: `chain_of_thought()` solver generates multi-token reasoning; max_tokens=32 always truncates before the final answer letter.
+- [x] `P4.3` **Answer format robustness**: answered by existing data.
+  - Falcon3-7B baseline: 1/1273 = 0.1% failures → negligible; no fallback extractor needed.
 
 ---
 
-## Phase 5 — Literature Comparison (30 min)
+## Phase 5 — Literature Comparison ✅ COMPLETE (2026-06-03)
 
-Build a comparison table: our results vs. published WMDP-bio numbers.
+Build a comparison table: our results vs. published WMDP-bio numbers.  
+Full output: `results/LITERATURE_COMPARISON.md`
 
-- [ ] `P5.1` Fetch published WMDP-bio leaderboard numbers from:
-  - WMDP paper: Li et al. (2024) "The WMDP Benchmark" — Table 2/3
-  - HuggingFace Open LLM Leaderboard (if WMDP included)
-  - Inspect Evals README (if published there)
-- [ ] `P5.2` Collect these published numbers (verify against primary source):
+- [x] `P5.1` Searched: WMDP paper (Li et al. 2024, arXiv:2403.03218, full text extracted), WMDP GitHub README, HuggingFace dataset card, WMDP.ai (JS-rendered — inaccessible), Falcon3 HuggingFace model card, OpenAlex, sci-papers MCP.
+- [x] `P5.2` Verified published numbers from primary source (WMDP paper, Table 2 Appendix B, logprob eval):
   ```
-  GPT-4 (gpt-4-0613)        | ?%  |  published
-  Claude-2                   | ?%  |  published
-  Llama-2-70B                | ?%  |  published  
-  Llama-2-7B                 | ?%  |  published
-  Mistral-7B-Instruct-v0.2   | ?%  |  published
-  Qwen2.5-7B-Instruct        | ?%  |  published / our run
-  Falcon3-1B/3B/7B/10B       | OUR RESULTS
+  GPT-4                      | 82.2%  |  Li et al. 2024 (logprob)
+  Yi-34b                     | 75.3%  |  Li et al. 2024 (logprob)
+  Mixtral-8x7B               | 74.8%  |  Li et al. 2024 (logprob)
+  zephyr-7b                  | 63.7%  |  Li et al. 2024 (logprob)
+  Claude-2                   | N/A    |  NOT in WMDP paper (prior entry was fabricated)
+  Llama-2-70B / 7B           | N/A    |  NOT in WMDP paper (prior entries were fabricated)
+  Mistral-7B-Instruct-v0.2   | N/A    |  NOT in WMDP paper (prior ~45% was unverified)
+  Falcon3-1B/3B/7B/10B       | OUR RESULTS (first published — no prior data exists)
+  Falcon3 technical report   | N/A    |  Not yet published (TII "coming soon" as of 2026-06)
   ```
-- [ ] `P5.3` Note any methodological differences (different prompt format, different split, logprob vs. text-parse) that could affect direct comparison
-- [ ] `P5.4` Add published numbers as horizontal reference lines on Figure 2 (scaling plot)
+- [x] `P5.3` Documented critical methodology gap: logprob (lm-eval-harness, paper) vs. text-gen (Inspect AI, ours). Logprob typically gives higher scores. Direct numeric comparison is approximate — within-cohort comparisons are the most valid. See `results/LITERATURE_COMPARISON.md § P5.3`.
+- [x] `P5.4` Updated `experiments/plot_results.py` Figure 2: replaced incorrect SIZE_MAP scatter points with horizontal dashed reference lines (GPT-4=82.2%, Mixtral=74.8%, Yi-34b=75.3%, zephyr=63.7%) labeled "logprob refs — different eval protocol".
+  - Also fixed `experiments/config.py:PUBLISHED_RESULTS` with 4 verified models + protocol note.
+  - Fixed `results/FINDINGS.md`: corrected GPT-4 (82.2% not 72.1%), removed fabricated Claude-2/Llama-2 entries.
 
 ---
 
