@@ -32,7 +32,7 @@ DATASET_N_SAMPLES = 1273  # full test set
 # ---------------------------------------------------------------------------
 TEMPERATURE = 0.0      # greedy — deterministic, reproducible
 SEED = 42
-MAX_TOKENS = 32        # MCQ answer is 1 token; 32 is generous buffer
+MAX_TOKENS = 512 # 512 for CoT; 32        # MCQ answer is 1 token; 32 is generous buffer
 
 # ---------------------------------------------------------------------------
 # Models — Falcon3 family (primary)
@@ -85,7 +85,7 @@ BASELINE_MODELS = {
         "params_b":     7.2,
         "quant":        "Q4_K_M",
         "est_time_min": 57,
-        "note": "Published WMDP-bio ~45% (Li et al. 2024) — cross-check opportunity",
+        "note": "We ran v0.3; Li et al. 2024 did NOT evaluate Mistral-7B — prior ~45% figure was unverified.",
     },
     "Qwen2.5-7B": {
         "ollama_tag":   "ollama/qwen2.5:7b",
@@ -108,17 +108,28 @@ BASELINE_MODELS = {
 ALL_MODELS = {**FALCON_MODELS, **BASELINE_MODELS}
 
 # ---------------------------------------------------------------------------
-# Published WMDP-bio numbers (from Li et al. 2024 "The WMDP Benchmark")
-# These are approximate values for reference/plotting; verify against paper.
-# Format: display_name → (accuracy_pct, source)
+# Published WMDP-bio numbers — VERIFIED against Li et al. 2024 (arXiv:2403.03218)
+#
+# CRITICAL METHODOLOGY NOTE:
+#   Li et al. use logprob evaluation (lm-eval-harness v0.4.2): takes the top
+#   log-probability over tokens A/B/C/D — no generation required.
+#   Our eval uses text generation (Inspect AI multiple_choice() solver):
+#   model generates a response, parser extracts the answer letter.
+#   Logprob eval typically yields higher scores. Direct comparison is
+#   approximate only; treat these as reference context, not exact benchmarks.
+#
+# Models evaluated in the WMDP paper: ONLY these four.
+# No Llama-2, Claude-2, Mistral-7B, Falcon-40B, or Qwen2.5 were evaluated.
+# Prior config entries for those models were unverified and have been removed.
+#
+# Format: display_name → (accuracy_pct_float, source_string)
 # ---------------------------------------------------------------------------
 PUBLISHED_RESULTS = {
-    "GPT-4 (gpt-4-0613)":     (72.1, "Li et al. 2024"),
-    "Claude-2":                (68.3, "Li et al. 2024"),
-    "Llama-2-70B":             (57.4, "Li et al. 2024"),
-    "Mistral-7B-v0.2":         (45.0, "Li et al. 2024"),  # approximate — verify
-    "Llama-2-13B":             (47.3, "Li et al. 2024"),
-    "Llama-2-7B":              (37.2, "Li et al. 2024"),
+    # Source: Li et al. 2024, Table 2 (Appendix B), logprob eval
+    "GPT-4":         (82.2, "Li et al. 2024 (logprob)"),
+    "Mixtral-8x7B":  (74.8, "Li et al. 2024 (logprob)"),
+    "Yi-34b":        (75.3, "Li et al. 2024 (logprob)"),
+    "zephyr-7b":     (63.7, "Li et al. 2024 (logprob)"),
 }
 
 # Random chance baseline

@@ -190,39 +190,28 @@ def fig2_scaling_falcon3(rows: list[dict]) -> None:
         ax.plot(x_fit, m * x_fit + b, "--", color=FALCON_BLUE, alpha=0.5,
                 label=f"Linear fit: {m:+.1f}%/log₂-param  R²={_r2(xs,ys,m,b):.2f}")
 
-    # Published reference points for similar-size models
-    pub_xs, pub_ys, pub_labels = [], [], []
-    SIZE_MAP = {
-        "Llama-2-7B":  7.0,
-        "Llama-2-13B": 13.0,
-        "Llama-2-70B": 70.0,
-        "Mistral-7B-v0.2": 7.0,
-    }
-    for name, (acc, src) in PUBLISHED_RESULTS.items():
-        if name in SIZE_MAP:
-            pub_xs.append(math.log2(SIZE_MAP[name]))
-            pub_ys.append(acc)
-            pub_labels.append(name.split()[0])  # first word for brevity
-
-    if pub_xs:
-        ax.scatter(pub_xs, pub_ys, color=PUBLISHED_RED, marker="^", s=80, zorder=4,
-                   label="Published (Li et al. 2024)")
-        for x_, y_, lbl in zip(pub_xs, pub_ys, pub_labels):
-            ax.annotate(lbl, (x_, y_), textcoords="offset points",
-                        xytext=(5, -12), fontsize=8, color=PUBLISHED_RED)
+    # Published reference lines (horizontal) — Li et al. 2024, logprob eval.
+    # Plotted as dashed lines with labels rather than scatter points because:
+    # (a) eval protocols differ (logprob vs text-gen), and
+    # (b) GPT-4/Yi-34b/Mixtral parameter counts are not directly comparable.
+    pub_line_styles = ["--", "-.", ":", (0, (3, 1, 1, 1))]
+    for i, (name, (acc, src)) in enumerate(PUBLISHED_RESULTS.items()):
+        ls = pub_line_styles[i % len(pub_line_styles)]
+        ax.axhline(acc, color=PUBLISHED_RED, linestyle=ls, linewidth=1.2, alpha=0.7,
+                   label=f"{name}: {acc:.1f}% ({src})", zorder=2)
 
     # Random chance
     ax.axhline(RANDOM_CHANCE * 100, color=RANDOM_COLOR, linestyle=":",
                label=f"Random chance ({RANDOM_CHANCE:.0%})")
 
     # X axis labels: show actual param counts
-    param_ticks = sorted(set(xs + pub_xs)) if pub_xs else xs
-    ax.set_xticks(param_ticks)
-    ax.set_xticklabels([f"{2**x:.1f}B" for x in param_ticks], rotation=15)
+    ax.set_xticks(xs)
+    ax.set_xticklabels([f"{2**x:.1f}B" for x in xs], rotation=15)
     ax.set_xlabel("Parameter count (log₂ scale)")
     ax.set_ylabel("WMDP-Bio Accuracy (%)")
-    ax.set_title("WMDP-Bio Scaling: Falcon3 vs. Published Results")
-    ax.legend(loc="upper left", fontsize=9)
+    ax.set_title("WMDP-Bio Scaling: Falcon3 Family\n"
+                 "(dashed = published logprob refs, Li et al. 2024 — different eval protocol)")
+    ax.legend(loc="upper left", fontsize=8)
     ax.yaxis.grid(True, alpha=0.4)
     ax.set_axisbelow(True)
 
