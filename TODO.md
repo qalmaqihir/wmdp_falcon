@@ -150,7 +150,7 @@ python experiments/run_wmdp_bio.py --model ollama/phi4-mini:latest
 
 ---
 
-## Phase 4 — Ablation Experiments ✅ COMPLETE (CoT result pending)
+## Phase 4 — Ablation Experiments ✅ COMPLETE
 
 These add scientific depth and distinguish the work from a simple benchmark run.
 
@@ -160,7 +160,7 @@ These add scientific depth and distinguish the work from a simple benchmark run.
 | Helpful system prompt | 71.2% | 68.6–73.6% | 3 (0.2%) | +0.3pp (not significant) |
 | Biosec system prompt | 70.5% | 67.9–72.9% | 5 (0.4%) | −0.4pp (not significant) |
 | CoT max_tokens=32 | 29.4% | 26.9–31.9% | 250 (19.6%) | ❌ INVALID — see note |
-| CoT max_tokens=512 | **PENDING** | — | — | rerun in progress |
+| CoT max_tokens=512 | **42.9%** | 40.2–45.6% | 4 (0.3%) | −28.0pp — CoT hurts |
 
 - [x] `P4.1` **System prompt ablation** (Falcon3-7B only, 1273 samples):
   - Condition A: no system prompt (baseline, already done in Phase 2) — 70.9%
@@ -168,11 +168,11 @@ These add scientific depth and distinguish the work from a simple benchmark run.
   - Condition C: biosecurity refusal prompt — **70.5%** (−0.4pp, within CI)
   - Result: **null result** — system prompts have no statistically significant effect.
   - The biosecurity suppression hypothesis is not supported.
-- [~] `P4.2` **Chain-of-thought ablation** (Falcon3-7B, full 1273):
+- [x] `P4.2` **Chain-of-thought ablation** (Falcon3-7B, full 1273):
   - Condition A: baseline — 70.9%
-  - Condition B (max_tokens=32): **INVALID** — 19.6% format failures; model reasoned past token limit, never output A–D. Not a real CoT measurement.
-  - Condition B (max_tokens=512): **rerun in progress** — result TBD.
-  - ⚠️ Note: `chain_of_thought()` solver generates multi-token reasoning; max_tokens=32 always truncates before the final answer letter.
+  - Condition B (max_tokens=32): **INVALID** — 19.6% format failures; truncated before answer.
+  - Condition B (max_tokens=512): **42.9%** (40.2–45.6%), 4 fmt-fails (0.3%), −28.0pp vs baseline, 84.5 min.
+  - **Finding**: CoT hurts Falcon3-7B on WMDP-bio by 28pp. Model produces full reasoning traces but reasons into wrong answers. Consistent with prior literature on CoT and factual knowledge MCQ.
 - [x] `P4.3` **Answer format robustness**: answered by existing data.
   - Falcon3-7B baseline: 1/1273 = 0.1% failures → negligible; no fallback extractor needed.
 

@@ -376,13 +376,15 @@ Two models are significantly different only when their 95% CIs do not overlap.
 
 ### Chain-of-Thought Ablation
 
-| Condition | max_tokens | Accuracy | Fmt-fail | Notes |
-|-----------|:----------:|:--------:|:--------:|-------|
-| Baseline | 32 | **70.9%** | 1 (0.1%) | |
-| CoT (invalid) | 32 | 29.4% | 250 (19.6%) | ❌ truncation artifact — see note |
-| CoT (512 tokens) | 512 | *pending* | — | rerun in progress |
+| Condition | max_tokens | Accuracy | 95% CI | Fmt-fail | Δ vs baseline |
+|-----------|:----------:|:--------:|--------|:--------:|:-------------:|
+| Baseline | 32 | **70.9%** | 68.4–73.4% | 1 (0.1%) | — |
+| CoT (invalid) | 32 | 29.4% | 26.9–31.9% | 250 (19.6%) | ❌ truncation artifact |
+| CoT (valid) | 512 | **42.9%** | 40.2–45.6% | 4 (0.3%) | **−28.0pp** |
 
-> The `max_tokens=32` CoT run is not a valid measurement. `chain_of_thought()` instructs the model to reason before answering; the 32-token budget truncates the reasoning trace before the final answer is output. The 250 format failures confirm truncation, not model failure. Rerun with `max_tokens=512` is the correct experiment.
+**Finding**: CoT reasoning **hurts** Falcon3-7B on WMDP-bio by 28pp. With max_tokens=512, the model produced full reasoning traces (only 4 format failures) but reasoned into wrong answers at dramatically higher rates. Parametric biosecurity knowledge is most accurately expressed via direct answer; extended reasoning introduces second-guessing that overrides correct responses.
+
+> ⚠️ The `max_tokens=32` CoT run is not a valid measurement — the 250 format failures confirm the model was truncated mid-thought before outputting an answer. The 42.9% figure from the 512-token rerun is the correct measurement. Wall time: 84.5 min (vs. 6.1 min baseline — ~14× slower).
 
 ---
 

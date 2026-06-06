@@ -76,9 +76,11 @@ The original hypothesis — that a biosecurity refusal prompt would suppress kno
 |-----------|------------|----------|--------|----------|-------|
 | **A — Baseline** | 32 | **70.9%** | 68.4–73.4% | 1 (0.1%) | |
 | **B — CoT (invalid)** | 32 | 29.4% | 26.9–31.9% | 250 (19.6%) | ❌ tool artifact — see note |
-| **B — CoT (rerun)** | 512 | **PENDING** | — | — | in progress |
+| **B — CoT (valid)** | 512 | **42.9%** | 40.2–45.6% | 4 (0.3%) | −28.0pp vs baseline |
 
-> ⚠️ **The max_tokens=32 CoT run is not a valid measurement.** `chain_of_thought()` prompts the model to reason before answering. With a 32-token generation budget, the model begins reasoning, is cut off mid-thought, and never outputs the final A–D answer. The 250 format failures (vs. 1 at baseline) confirm this: the model was not confused — it was truncated. The 29.4% score is near-random (25%) because 374 valid letter extractions happened to fall inside the 32-token window by chance. A rerun with max_tokens=512 is the valid measurement and is currently in progress.
+> ⚠️ **The max_tokens=32 CoT run is not a valid measurement.** `chain_of_thought()` prompts the model to reason before answering. With a 32-token generation budget, the model begins reasoning, is cut off mid-thought, and never outputs the final A–D answer. The 250 format failures (vs. 1 at baseline) confirm this: the model was not confused — it was truncated. The 29.4% score is near-random (25%) because 374 valid letter extractions happened to fall inside the 32-token window by chance.
+>
+> **Valid result (512-token rerun)**: With adequate budget (max_tokens=512), format failures drop to 4 (0.3%) — the model completed reasoning chains. Accuracy fell to **42.9%** (−28.0pp vs. 70.9% baseline). This is a large, unambiguous negative finding: CoT reasoning actively hurts Falcon3-7B on WMDP-bio. The model reasons its way into wrong answers despite having full token budget. Wall time: 84.5 min (vs. 6.1 min baseline — ~14× slower). This is consistent with prior literature showing CoT often hurts on factual knowledge recall MCQ benchmarks.
 
 ### P4.3 — Format Robustness
 
@@ -135,9 +137,11 @@ The 7–8B cluster tells a coherent story. Adding Gemma2-9B would complete the "
 
 A null result here is scientifically meaningful, not a failure. It directly answers the question: can you use system prompt framing to reduce a model's demonstrated biosecurity capability on WMDP? Answer: no. This is worth reporting clearly. Running additional prompts (e.g., adversarial or chain-of-thought variants) would be scope creep. The 3-condition design is sufficient for the claim.
 
-### CoT Ablation (Phase 4.2): **Reframe after seeing 512-token result**
+### CoT Ablation (Phase 4.2): **Conclude — strong negative finding**
 
-The original question ("does CoT improve MCQ accuracy?") assumed CoT would work within the existing max_tokens=32 protocol. It doesn't — that was a tooling gap, now fixed. The reframed question is: with adequate token budget (512), does CoT help or hurt Falcon3-7B on WMDP-bio? Prior literature on factual MCQ suggests CoT often **hurts** on knowledge recall benchmarks (the reasoning can override the model's parametric knowledge, or introduce second-guessing). If the 512-token result confirms this, it is a genuine negative finding worth reporting. If CoT helps, it raises a question about why the direct-answer protocol is suboptimal — also interesting. **Hold judgment until the rerun completes.**
+CoT (512-token, valid) drops accuracy from 70.9% to **42.9%** (−28.0pp). Only 4/1273 format failures, so the model produced full reasoning traces — it simply reasoned into wrong answers at dramatically higher rates. This confirms the prior-literature expectation: CoT hurts on factual knowledge recall MCQ. The model's parametric biosecurity knowledge is most accurately expressed via direct answer; extended reasoning introduces second-guessing and overrides correct instinctive responses.
+
+**Result is definitive** — no further CoT runs needed. The 14× slowdown (84.5 min vs. 6.1 min) makes CoT impractical as an eval protocol regardless of accuracy impact.
 
 ### Format Robustness (Phase 4.3): **Conclude — answered by existing data**
 
@@ -145,4 +149,4 @@ The original question ("does CoT improve MCQ accuracy?") assumed CoT would work 
 
 ---
 
-*Results complete as of 2026-06-03. CoT (512-token) result pending — update P4.2 table when available.*
+*Results complete as of 2026-06-03. All ablations concluded including CoT (512-token) valid rerun.*
