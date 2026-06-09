@@ -219,3 +219,5 @@ __marimo__/
 
 notebooks/logs/*
 notebooks/logs_hf/*
+.ipynb_checkpoints/
+.claude/*
