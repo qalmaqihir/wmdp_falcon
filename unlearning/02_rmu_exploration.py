@@ -50,11 +50,67 @@ from unlearning.utils import (
 SEP_THICK = "=" * 64
 SEP_THIN  = "-" * 64
 
-# NOTE: All sample texts used below are generic placeholders.
-# In real RMU training, the forget loader provides domain-specific text
-# via build_forget_loader() in utils.py. We use neutral text here so
-# this exploration file contains no sensitive content.
-_SAMPLE_TEXT = "<Dummy Text for forget data>"          # safe placeholder for demo
+def _load_real_samples() -> tuple[str, str]:
+    """Fetch one real forget sample and one real retain sample from the actual datasets.
+
+    Mirrors the two-tier strategy in build_forget_loader():
+      - Forget: cais/wmdp-corpora bio-remove-corpus (canonical WMDP paper corpus).
+                Falls back to cais/wmdp wmdp-bio MCQ formatted as plain text
+                if the primary corpus is gated or unavailable.
+      - Retain: wikitext/wikitext-2-raw-v1 (same as build_retain_loader()).
+
+    Returns:
+        (forget_text, retain_text) — two non-empty strings ready for tokenization.
+    """
+    from datasets import load_dataset
+
+    print("[samples] Loading real forget sample ...")
+    forget_text: str | None = None
+    try:
+        ds = load_dataset(
+            "cais/wmdp-corpora", "bio-remove-corpus", split="train",
+            trust_remote_code=False,
+        )
+        for row in ds:
+            text = row.get("text", "").strip()
+            if len(text) > 100:
+                forget_text = text[:600]
+                break
+        if forget_text:
+            print(f"[samples] forget — wmdp-corpora: {len(forget_text)} chars")
+    except Exception as e:
+        if any(kw in str(e).lower() for kw in ["gated", "401", "403", "unauthorized", "restricted"]):
+            print(f"[samples] wmdp-corpora gated — falling back to wmdp-bio MCQ.")
+        else:
+            print(f"[samples] wmdp-corpora unavailable ({type(e).__name__}) — using MCQ fallback.")
+
+    if forget_text is None:
+        ds = load_dataset("cais/wmdp", "wmdp-bio", split="test", trust_remote_code=False)
+        row = list(ds)[0]
+        choices = row["choices"]
+        letters = ["A", "B", "C", "D"]
+        ans_letter = letters[row["answer"]]
+        ans_text = choices[row["answer"]]
+        forget_text = (
+            f"Question: {row['question']}\n"
+            f"A) {choices[0]}\nB) {choices[1]}\nC) {choices[2]}\nD) {choices[3]}\n"
+            f"Answer: {ans_letter}) {ans_text}"
+        )
+        print(f"[samples] forget — wmdp-bio MCQ fallback: {len(forget_text)} chars")
+
+    print("[samples] Loading real retain sample ...")
+    ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="train", trust_remote_code=False)
+    retain_text: str | None = None
+    for row in ds:
+        text = row.get("text", "").strip()
+        if len(text) > 100:
+            retain_text = text[:600]
+            break
+    if retain_text is None:
+        retain_text = "The history of science spans many centuries and civilizations."
+    print(f"[samples] retain — wikitext-2: {len(retain_text)} chars")
+
+    return forget_text, retain_text
 
 
 # ===========================================================================
@@ -84,19 +140,14 @@ def section_architecture_recap(model) -> None:
 # Section 2 — Forward hooks
 # ===========================================================================
 
-def section_forward_hooks(model, device) -> None:
+def section_forward_hooks(model, tokenizer, device, forget_sample: str) -> None:
     """Demo: register a hook, run a forward pass, print the hidden state, remove."""
     print(f"\n{SEP_THICK}")
     print("  SECTION 2: Forward Hooks — Live Demo")
     print(SEP_THICK)
 
-    # ── Sample input ──────────────────────────────────────────────────────
-    # NOTE: using a generic placeholder — real forget data comes from build_forget_loader().
-    sample = _SAMPLE_TEXT
-    from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_ID)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+    # ── Sample input — real biosecurity forget text ────────────────────────
+    sample = forget_sample
     inputs = tokenizer(sample, return_tensors="pt", truncation=True, max_length=64)
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
@@ -113,7 +164,7 @@ def section_forward_hooks(model, device) -> None:
     print(f"  Registering hook on model.model.layers[{RMU_LAYER}] ...")
     handle = model.model.layers[RMU_LAYER].register_forward_hook(my_hook)
 
-    print(f"  Running forward pass on sample text (placeholder) ...")
+    print(f"  Running forward pass on real forget sample ...")
     model.eval()
     with torch.no_grad():
         _ = model(**inputs)
@@ -187,14 +238,16 @@ def section_random_vector(hidden_size: int, device: torch.device) -> torch.Tenso
 # Section 4 — Forget loss preview
 # ===========================================================================
 
-def section_forget_loss_preview(model, tokenizer, device, c: torch.Tensor) -> None:
+def section_forget_loss_preview(
+    model, tokenizer, device, c: torch.Tensor, forget_sample: str
+) -> None:
     """Demo: compute MSE between hidden state and alpha*c for several alpha values."""
     print(f"\n{SEP_THICK}")
     print("  SECTION 4: Forget Loss Preview (no training)")
     print(SEP_THICK)
 
-    # NOTE: placeholder text — real forget batches come from build_forget_loader().
-    sample = _SAMPLE_TEXT  # <Dummy Text for forget data>
+    # Real biosecurity forget text — same source as build_forget_loader().
+    sample = forget_sample
     inputs = tokenizer(sample, return_tensors="pt", truncation=True, max_length=64)
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
@@ -236,14 +289,15 @@ def section_forget_loss_preview(model, tokenizer, device, c: torch.Tensor) -> No
 # Section 5 — Retain loss preview
 # ===========================================================================
 
-def section_retain_loss_preview(model, frozen_model, tokenizer, device) -> None:
+def section_retain_loss_preview(
+    model, frozen_model, tokenizer, device, retain_sample: str
+) -> None:
     """Demo: MSE(h_live, h_frozen) starts at ~0 when both models are identical."""
     print(f"\n{SEP_THICK}")
     print("  SECTION 5: Retain Loss Preview (no training)")
     print(SEP_THICK)
 
-    # NOTE: retain text is general text (Wikitext). Using placeholder here.
-    retain_sample = "The history of science spans many centuries and civilizations."
+    # Real Wikitext-2 retain text — same source as build_retain_loader().
     inputs = tokenizer(retain_sample, return_tensors="pt", truncation=True, max_length=64)
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
@@ -293,15 +347,16 @@ def section_retain_loss_preview(model, frozen_model, tokenizer, device) -> None:
 # Section 6 — Two-pass dry run
 # ===========================================================================
 
-def section_two_pass_dry_run(model, frozen_model, tokenizer, device, c: torch.Tensor) -> None:
+def section_two_pass_dry_run(
+    model, frozen_model, tokenizer, device, c: torch.Tensor,
+    forget_sample: str, retain_sample: str,
+) -> None:
     """Demo: walk through exactly one RMU step without optimizer.step()."""
     print(f"\n{SEP_THICK}")
     print("  SECTION 6: Two-Pass Dry Run (full step, no optimizer.step)")
     print(SEP_THICK)
 
-    # NOTE: forget text is a placeholder — real training uses build_forget_loader().
-    forget_sample  = _SAMPLE_TEXT   # <Dummy Text for forget data>
-    retain_sample  = "The Eiffel Tower was built between 1887 and 1889."
+    # Real samples — same sources as build_forget_loader() / build_retain_loader().
 
     f_inputs = tokenizer(forget_sample, return_tensors="pt", truncation=True, max_length=64)
     r_inputs = tokenizer(retain_sample, return_tensors="pt", truncation=True, max_length=64)
@@ -432,6 +487,9 @@ def main() -> None:
 
     device = get_device()
 
+    # ── Load real samples from the actual datasets ───────────────────────────
+    forget_sample, retain_sample = _load_real_samples()
+
     # ── Load live model ──────────────────────────────────────────────────────
     print("[load] Loading live model (not frozen) ...")
     model, tokenizer = load_model_and_tokenizer(HF_MODEL_ID, device, frozen=False)
@@ -441,23 +499,24 @@ def main() -> None:
     section_architecture_recap(model)
 
     # ── Section 2: forward hooks ─────────────────────────────────────────────
-    section_forward_hooks(model, device)
+    section_forward_hooks(model, tokenizer, device, forget_sample)
 
     # ── Section 3: random misdirection vector ───────────────────────────────
     c = section_random_vector(hidden_size, device)
 
     # ── Section 4: forget loss preview ──────────────────────────────────────
-    section_forget_loss_preview(model, tokenizer, device, c)
+    section_forget_loss_preview(model, tokenizer, device, c, forget_sample)
 
     # ── Load frozen model for retain sections ───────────────────────────────
     print("\n[load] Loading frozen reference model ...")
     frozen_model, _ = load_model_and_tokenizer(HF_MODEL_ID, device, frozen=True)
 
     # ── Section 5: retain loss preview ──────────────────────────────────────
-    section_retain_loss_preview(model, frozen_model, tokenizer, device)
+    section_retain_loss_preview(model, frozen_model, tokenizer, device, retain_sample)
 
     # ── Section 6: two-pass dry run ─────────────────────────────────────────
-    section_two_pass_dry_run(model, frozen_model, tokenizer, device, c)
+    section_two_pass_dry_run(model, frozen_model, tokenizer, device, c,
+                             forget_sample, retain_sample)
 
     # ── Section 7: why MSE ───────────────────────────────────────────────────
     section_why_mse()

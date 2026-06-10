@@ -1,7 +1,7 @@
 """
 Unlearning module configuration.
 
-All constants for GA, GD, and future RMU methods live here.
+All constants for GA, GD, and RMU methods live here.
 Mirrors experiments/config.py style — change here only, never inline.
 
 Reference: UNLEARNING_METHODS.md in project root for theory behind each value.
