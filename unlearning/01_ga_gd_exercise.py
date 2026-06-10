@@ -147,6 +147,30 @@ def setup(args) -> tuple:
 
 
 # ===========================================================================
+# SECTION 0b — DATA INSPECTION  (diagnostic helper)
+# ===========================================================================
+
+def print_loader_samples(loader, tokenizer, label: str, n: int = 4) -> None:
+    """Decode and print n batches from a DataLoader for sanity-checking."""
+    print(f"\n{'─' * 60}")
+    print(f"  DATA SAMPLE — {label}")
+    print(f"{'─' * 60}")
+    for i, batch in enumerate(loader):
+        if i >= n:
+            break
+        ids = batch["input_ids"][0]  # first item in batch, shape (seq_len,)
+        # Strip padding (token id 0 or pad_token_id)
+        pad_id = tokenizer.pad_token_id or 0
+        ids_clean = ids[ids != pad_id]
+        text = tokenizer.decode(ids_clean, skip_special_tokens=True)
+        print(f"\n  [sample {i+1}]  tokens={len(ids_clean)}")
+        # Print first 400 chars so terminal stays readable
+        preview = text[:400].replace("\n", " ↵ ")
+        print(f"  {preview}{'...' if len(text) > 400 else ''}")
+    print(f"{'─' * 60}\n")
+
+
+# ===========================================================================
 # SECTION 1 — BASELINE EVAL  (provided — do not modify)
 # ===========================================================================
 
@@ -211,22 +235,26 @@ def ga_loss(model: torch.nn.Module, forget_batch: dict) -> torch.Tensor:
     └──────────────────────────────────────────────────────────────┘
     """
     # ########## Complete the Implementation ##########
+    try:
+        
+        # Step 1: extract tensors from the batch dict
+        input_ids = forget_batch["input_ids"]
+        labels = forget_batch["labels"]
+        attention_mask = forget_batch["attention_mask"]
 
-    # Step 1: extract tensors from the batch dict
+        # Step 2: forward pass through the model with labels
+        outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
 
+        # Step 3: get the standard language modeling loss
+        loss = outputs.loss
 
-    # Step 2: forward pass through the model with labels
-    # outputs = model(...)
-
-    # Step 3: get the standard language modeling loss
-    # loss = outputs.loss
-
-    # Step 4: negate and return (maximise = minimise negative)
-    # return -loss
-
-    raise NotImplementedError(
-        "TODO 1: implement ga_loss(). ~3 lines. See docstring above."
-    )
+        # Step 4: negate and return (maximise = minimise negative)
+        return -loss
+    except Exception as e:
+        print(f"Exception: {str(e)}\n")
+        raise NotImplementedError(
+            "TODO 1: implement ga_loss(). ~3 lines. See docstring above."
+        )
     # ##################################################
 
 
@@ -295,20 +323,34 @@ def gd_loss(
     └──────────────────────────────────────────────────────────────┘
     """
     # ########## Complete the Implementation ##########
+    try:
+        
+        # Step 1: compute the forget term (use ga_loss or inline)
+        # forget_term = alpha * ga_loss(model, forget_batch)
+        
+        forget_term = alpha * ga_loss(model, forget_batch)
 
-    # Step 1: compute the forget term (use ga_loss or inline)
-    # forget_term = alpha * ga_loss(model, forget_batch)
+        # Step 2: compute the retain term (standard CE, no negation)
+        # retain_outputs = model(...)
+        # retain_term = retain_outputs.loss
+        
+        input_ids_retain = retain_batch["input_ids"]
+        labels_retain = retain_batch["labels"]
+        attention_mask_retain = retain_batch["attention_mask"]
+        
+        retain_outptus = model(input_ids=input_ids_retain, attention_mask=attention_mask_retain, labels=labels_retain)
+        retain_term = retain_outptus.loss
 
-    # Step 2: compute the retain term (standard CE, no negation)
-    # retain_outputs = model(...)
-    # retain_term = retain_outputs.loss
-
-    # Step 3: combine and return
-    # return forget_term + beta * retain_term
-
-    raise NotImplementedError(
-        "TODO 2: implement gd_loss(). ~5 lines. See docstring above."
-    )
+        # Step 3: combine and return
+        # return forget_term + beta * retain_term
+        
+        return forget_term + beta*retain_term
+    
+    except Exception as e:
+        print(f"Exception: {str(e)}\n")
+        raise NotImplementedError(
+            "TODO 2: implement gd_loss(). ~5 lines. See docstring above."
+        )
     # ##################################################
 
 
@@ -405,8 +447,13 @@ def train_unlearning(
     # ########## Complete the Implementation ##########
 
     # Step 1: set model to training mode
+    model.train()
 
     # Step 2: create infinite iterators
+    from itertools import cycle
+    forget_iter = cycle(forget_loader)
+    retain_iter = cycle(retain_loader)
+    
     # forget_iter = cycle(forget_loader)
     # retain_iter = cycle(retain_loader)
 
@@ -415,12 +462,40 @@ def train_unlearning(
     # for step in range(steps):
     #     ... (see docstring above for sub-steps)
     #     history.append(...)
-
-    # Step 4: return history
-
-    raise NotImplementedError(
-        "TODO 3: implement train_unlearning(). ~25 lines. See docstring above."
-    )
+    try:
+        history = []
+        for step in range(steps):
+            batch_f = next(forget_iter)
+            batch_f ={k:v.to(device) for k,v in batch_f.items()}
+            if method == "ga":
+                loss = ga_loss(model, batch_f)
+            if method == "gd":
+                batch_r = next(retain_iter)
+                batch_r = {k:v.to(device) for k, v in batch_r.items()}
+                loss = gd_loss(model, batch_f, batch_r, alpha=alpha, beta=beta)
+            
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            
+            print(f"[Training] Step {step+1}/{steps}  loss={loss.item():.4f}")
+            
+            if (step + 1) % EVAL_EVERY == 0:
+                model.eval()
+                r = quick_wmdp_eval(model, tokenizer, device, n_samples=EVAL_N_SAMPLES)
+                model.train()
+                print(f"[Eval] Step {step+1}/{steps}  loss={loss.item():.4f} accuracy={r['accuracy']:.4f}\n")
+                history.append((step + 1, loss.item(), r['accuracy']))
+            else:
+                history.append((step + 1, loss.item(), None))
+            
+        # Step 4: return history
+        return history
+    except Exception as e:
+        print(f"Exception: {str(e)}")
+        raise NotImplementedError(
+            "TODO 3: implement train_unlearning(). ~25 lines. See docstring above."
+        )
     # ##################################################
 
 
@@ -555,6 +630,10 @@ def main() -> None:
 
     # Section 0: setup.
     model, tokenizer, forget_loader, retain_loader, optimizer, device = setup(args)
+
+    # Section 0b: data sanity check — decode 2 samples from each loader.
+    print_loader_samples(forget_loader, tokenizer, "FORGET (biosecurity)")
+    print_loader_samples(retain_loader, tokenizer, "RETAIN (Wikitext-2)")
 
     # Section 1: baseline eval.
     if args.skip_baseline:

@@ -35,6 +35,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from unlearning.utils import get_device, load_model_and_tokenizer, print_architecture_summary
 from unlearning.config import HF_MODEL_ID
 
+########## To Avoid warning for unautheniticated HF requests
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+# print(os.getenv("HF_TOKEN"))
+########## To Avoid warning for unautheniticated HF requests
 
 def explore_layer_internals(model) -> None:
     """Print the internal structure of a single transformer block."""
@@ -156,6 +163,7 @@ def main() -> None:
     print("=" * 60)
 
     device = get_device()
+
     model, tokenizer = load_model_and_tokenizer(HF_MODEL_ID, device, frozen=True)
 
     # 1. High-level structural summary.

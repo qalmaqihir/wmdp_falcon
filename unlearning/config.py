@@ -29,7 +29,7 @@ FORGET_DATASET_PRIMARY  = ("cais/wmdp-corpora", "bio-remove-corpus", "train")
 FORGET_DATASET_FALLBACK = ("cais/wmdp",          "wmdp-bio",          "test")
 
 # Retain set: Wikitext-2, small and general, no auth required.
-RETAIN_DATASET = ("wikitext", "wikitext-2-raw-v1", "train")
+RETAIN_DATASET = ("Salesforce/wikitext", "wikitext-2-raw-v1", "train")
 
 # ---------------------------------------------------------------------------
 # Sequence length and batching
