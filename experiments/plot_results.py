@@ -59,6 +59,21 @@ RANDOM_COLOR  = "#999933"
 
 FALCON_SHADES = ["#4477AA", "#66AABB", "#88CCEE", "#AADDCC"]  # 1B→10B
 
+# Ablation palette
+ABLATION_COLORS = {
+    "none":    "#4477AA",  # FALCON_BLUE
+    "helpful": "#44BB99",  # teal-green
+    "biosec":  "#EE8833",  # amber-orange
+}
+CONDITION_LABELS = {
+    "none":    "Baseline\n(no system prompt)",
+    "helpful": "Helpful\n(\"You are a helpful assistant.\")",
+    "biosec":  "Biosec\n(refusal system prompt)",
+}
+COT_BLUE    = "#4477AA"
+COT_INVALID = "#CCCCCC"
+COT_VALID   = "#CC3311"
+
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
@@ -352,6 +367,349 @@ def fig4_cdf_comparison(rows: list[dict]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Ablation helpers
+# ---------------------------------------------------------------------------
+
+FALCON7B_TAG = "ollama/falcon3:7b"
+
+
+def _latest_per_condition(rows: list[dict], model_tag: str, use_cot: bool) -> dict:
+    """Return {system_prompt → row} keeping the most recent row per condition."""
+    best: dict[str, dict] = {}
+    for r in rows:
+        if r.get("model_tag") != model_tag:
+            continue
+        if str(r.get("use_cot", "False")).strip().lower() != str(use_cot).lower():
+            continue
+        sp = r.get("system_prompt", "none")
+        ts = r.get("timestamp_utc", "")
+        if sp not in best or ts > best[sp].get("timestamp_utc", ""):
+            best[sp] = r
+    return best
+
+
+def _acc_ci(r: dict) -> tuple[float, float, float]:
+    acc  = float(r["accuracy"]) * 100
+    cilo = acc - float(r["ci_lo"]) * 100
+    cihi = float(r["ci_hi"]) * 100 - acc
+    return acc, cilo, cihi
+
+
+# ---------------------------------------------------------------------------
+# Figure 5 — System prompt ablation (Falcon3-7B, Phase 4.1)
+# ---------------------------------------------------------------------------
+
+def fig5_system_prompt_ablation(rows: list[dict]) -> None:
+    conds = _latest_per_condition(rows, FALCON7B_TAG, use_cot=False)
+    order = [k for k in ("none", "helpful", "biosec") if k in conds]
+    if not order:
+        print("Fig 5: no system prompt ablation data.")
+        return
+
+    accs, ci_los, ci_his = zip(*[_acc_ci(conds[k]) for k in order])
+    colors = [ABLATION_COLORS[k] for k in order]
+    labels = [CONDITION_LABELS[k] for k in order]
+    x = np.arange(len(order))
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5),
+                             gridspec_kw={"width_ratios": [1.6, 1]})
+
+    # — Left panel: full 0–100% range —
+    ax = axes[0]
+    bars = ax.bar(x, accs, color=colors, width=0.5, zorder=3, alpha=0.9)
+    ax.errorbar(x, accs, yerr=[list(ci_los), list(ci_his)],
+                fmt="none", color="black", capsize=6, linewidth=2, zorder=4)
+    ax.axhline(RANDOM_CHANCE * 100, color=RANDOM_COLOR, linestyle=":",
+               linewidth=1.5, label=f"Random chance (25%)", zorder=2)
+    for bar_, acc in zip(bars, accs):
+        ax.text(bar_.get_x() + bar_.get_width() / 2,
+                bar_.get_height() + 1.5,
+                f"{acc:.1f}%", ha="center", va="bottom", fontsize=10, fontweight="bold")
+
+    base_acc = float(conds["none"]["accuracy"]) * 100 if "none" in conds else None
+    for i, (k, acc) in enumerate(zip(order, accs)):
+        if k != "none" and base_acc is not None:
+            delta = acc - base_acc
+            sign = "+" if delta >= 0 else ""
+            ax.text(x[i], acc / 2,
+                    f"Δ{sign}{delta:.1f}pp", ha="center", va="center",
+                    fontsize=9, color="white", fontweight="bold")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=9)
+    ax.set_ylabel("WMDP-Bio Accuracy (%)")
+    ax.set_title("System Prompt Ablation (Falcon3-7B)\n"
+                 "n=1273 · 95% Wilson CI · null result")
+    ax.set_ylim(0, 100)
+    ax.yaxis.grid(True, alpha=0.4, zorder=0)
+    ax.set_axisbelow(True)
+    ax.legend(loc="lower right", fontsize=9)
+
+    # — Right panel: zoomed 60–80% to show CI overlap clearly —
+    ax2 = axes[1]
+    bars2 = ax2.bar(x, accs, color=colors, width=0.5, zorder=3, alpha=0.9)
+    ax2.errorbar(x, accs, yerr=[list(ci_los), list(ci_his)],
+                 fmt="none", color="black", capsize=6, linewidth=2, zorder=4)
+    for bar_, acc in zip(bars2, accs):
+        ax2.text(bar_.get_x() + bar_.get_width() / 2,
+                 acc + ci_his[list(accs).index(acc)] + 0.4,
+                 f"{acc:.1f}%", ha="center", va="bottom", fontsize=9)
+    ax2.set_ylim(60, 80)
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(["Base", "Help", "Bio"], fontsize=9)
+    ax2.set_ylabel("WMDP-Bio Accuracy (%)")
+    ax2.set_title("Zoomed 60–80%\n(CIs fully overlap — no significant difference)")
+    ax2.yaxis.grid(True, alpha=0.4, zorder=0)
+    ax2.set_axisbelow(True)
+
+    # Annotate "CIs overlap" on zoomed panel
+    ax2.text(0.5, 0.05, "All 95% CIs overlap\n⇒ null result (no significant effect)",
+             ha="center", va="bottom", transform=ax2.transAxes,
+             fontsize=8, color="dimgray",
+             bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow", alpha=0.8))
+
+    fig.suptitle("Phase 4.1 — System Prompt Effect on Falcon3-7B WMDP-Bio Accuracy",
+                 fontsize=13, fontweight="bold")
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    _save(fig, "fig5_system_prompt_ablation")
+
+
+# ---------------------------------------------------------------------------
+# Figure 6 — CoT ablation (Falcon3-7B, Phase 4.2)
+# ---------------------------------------------------------------------------
+
+def fig6_cot_ablation(rows: list[dict]) -> None:
+    # Baseline row
+    base_conds = _latest_per_condition(rows, FALCON7B_TAG, use_cot=False)
+    if "none" not in base_conds:
+        print("Fig 6: no Falcon3-7B baseline row.")
+        return
+
+    # CoT rows: two entries with use_cot=True, distinguished by format_failures
+    cot_rows = [
+        r for r in rows
+        if r.get("model_tag") == FALCON7B_TAG
+        and str(r.get("use_cot", "False")).strip().lower() == "true"
+        and r.get("system_prompt", "none") == "none"
+    ]
+    if not cot_rows:
+        print("Fig 6: no CoT rows.")
+        return
+
+    # Invalid = high format_failures (truncated); valid = low format_failures
+    cot_invalid = next((r for r in cot_rows if int(r.get("format_failures", 0)) > 50), None)
+    cot_valid   = next((r for r in cot_rows if int(r.get("format_failures", 0)) <= 50), None)
+
+    bar_defs = [
+        ("Baseline\n(no CoT)", base_conds["none"], COT_BLUE,    False, None),
+    ]
+    if cot_invalid:
+        bar_defs.append(
+            ("CoT — 32-tok\n[INVALID] (truncated)", cot_invalid, COT_INVALID, True,
+             f"250 format\nfailures")
+        )
+    if cot_valid:
+        bar_defs.append(
+            ("CoT — 512-tok\n[Valid]", cot_valid, COT_VALID, False,
+             f"4 format\nfailures")
+        )
+
+    labels, row_list, colors, hatches, annots = zip(*bar_defs)
+    accs, ci_los, ci_his = zip(*[_acc_ci(r) for r in row_list])
+    x = np.arange(len(bar_defs))
+
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    bars = []
+    for i, (acc, color, hatch) in enumerate(zip(accs, colors, hatches)):
+        b = ax.bar(x[i], acc, color=color, width=0.55, zorder=3,
+                   hatch="///" if hatch else "", edgecolor="grey" if hatch else color,
+                   alpha=0.7 if hatch else 0.9)
+        bars.append(b)
+
+    ax.errorbar(x, accs, yerr=[list(ci_los), list(ci_his)],
+                fmt="none", color="black", capsize=6, linewidth=2, zorder=4)
+
+    ax.axhline(RANDOM_CHANCE * 100, color=RANDOM_COLOR, linestyle=":",
+               linewidth=1.5, label=f"Random chance (25%)", zorder=2)
+
+    # Value labels above bars
+    for i, (bar_, acc, ci_h) in enumerate(zip(bars, accs, ci_his)):
+        ax.text(x[i], acc + ci_h + 1.0,
+                f"{acc:.1f}%", ha="center", va="bottom", fontsize=10, fontweight="bold")
+
+    # Delta annotation on CoT-valid bar
+    base_acc = accs[0]
+    if cot_valid and len(accs) >= 3:
+        delta = accs[-1] - base_acc
+        ax.annotate(f"Δ={delta:+.1f}pp\n(−28.0pp)",
+                    xy=(x[-1], accs[-1]),
+                    xytext=(x[-1] + 0.35, accs[-1] + 8),
+                    fontsize=9, color=COT_VALID, fontweight="bold",
+                    arrowprops=dict(arrowstyle="->", color=COT_VALID, lw=1.5))
+
+    # Annotation: invalid bar explanation
+    if cot_invalid:
+        inv_idx = 1
+        ax.text(x[inv_idx], 5,
+                "Truncated at 32 tokens\nModel never output\nfinal answer letter",
+                ha="center", va="bottom", fontsize=8, color="dimgray",
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="whitesmoke", alpha=0.9))
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=9)
+    ax.set_ylabel("WMDP-Bio Accuracy (%)")
+    ax.set_title("Phase 4.2 — Chain-of-Thought Ablation: Falcon3-7B\n"
+                 "n=1273 · error bars = 95% Wilson CI · valid CoT = −28.0pp vs baseline",
+                 fontsize=12)
+    ax.set_ylim(0, 100)
+    ax.yaxis.grid(True, alpha=0.4, zorder=0)
+    ax.set_axisbelow(True)
+    ax.legend(loc="upper right", fontsize=9)
+
+    # Legend for bar types
+    import matplotlib.patches as mpatches
+    patch_baseline  = mpatches.Patch(color=COT_BLUE,    label="Baseline (no CoT, max_tokens=32)")
+    patch_invalid   = mpatches.Patch(facecolor=COT_INVALID, hatch="///", edgecolor="grey",
+                                     label="CoT invalid — 32-tok budget (truncated)")
+    patch_valid     = mpatches.Patch(color=COT_VALID,   label="CoT valid — 512-tok budget")
+    rand_line       = plt.Line2D([0], [0], color=RANDOM_COLOR, linestyle=":",
+                                 label="Random chance (25%)")
+    ax.legend(handles=[patch_baseline, patch_invalid, patch_valid, rand_line],
+              loc="upper right", fontsize=9)
+
+    fig.tight_layout()
+    _save(fig, "fig6_cot_ablation")
+
+
+# ---------------------------------------------------------------------------
+# Figure 7 — Combined ablation panel (2-panel, Phase 4.1 + 4.2)
+# ---------------------------------------------------------------------------
+
+def fig7_ablation_panel(rows: list[dict]) -> None:
+    # Gather data (same logic as fig5/fig6)
+    sp_conds = _latest_per_condition(rows, FALCON7B_TAG, use_cot=False)
+    sp_order = [k for k in ("none", "helpful", "biosec") if k in sp_conds]
+
+    base_conds = _latest_per_condition(rows, FALCON7B_TAG, use_cot=False)
+    cot_rows = [
+        r for r in rows
+        if r.get("model_tag") == FALCON7B_TAG
+        and str(r.get("use_cot", "False")).strip().lower() == "true"
+        and r.get("system_prompt", "none") == "none"
+    ]
+    cot_invalid = next((r for r in cot_rows if int(r.get("format_failures", 0)) > 50), None)
+    cot_valid   = next((r for r in cot_rows if int(r.get("format_failures", 0)) <= 50), None)
+
+    if not sp_order or "none" not in base_conds:
+        print("Fig 7: insufficient data.")
+        return
+
+    fig, (ax_sp, ax_cot) = plt.subplots(1, 2, figsize=(14, 5.5), sharey=False)
+
+    # ── Left: system prompt (P4.1) ──────────────────────────────────────────
+    sp_accs, sp_ci_los, sp_ci_his = zip(*[_acc_ci(sp_conds[k]) for k in sp_order])
+    sp_colors = [ABLATION_COLORS[k] for k in sp_order]
+    sp_labels = [CONDITION_LABELS[k] for k in sp_order]
+    x_sp = np.arange(len(sp_order))
+
+    bars_sp = ax_sp.bar(x_sp, sp_accs, color=sp_colors, width=0.5, zorder=3, alpha=0.9)
+    ax_sp.errorbar(x_sp, sp_accs, yerr=[list(sp_ci_los), list(sp_ci_his)],
+                   fmt="none", color="black", capsize=5, linewidth=1.8, zorder=4)
+    ax_sp.axhline(RANDOM_CHANCE * 100, color=RANDOM_COLOR, linestyle=":",
+                  linewidth=1.4, zorder=2)
+    for bar_, acc in zip(bars_sp, sp_accs):
+        ax_sp.text(bar_.get_x() + bar_.get_width() / 2, acc + 1.2,
+                   f"{acc:.1f}%", ha="center", va="bottom", fontsize=9, fontweight="bold")
+
+    base_sp = float(sp_conds["none"]["accuracy"]) * 100
+    for i, (k, acc) in enumerate(zip(sp_order, sp_accs)):
+        if k != "none":
+            delta = acc - base_sp
+            sign = "+" if delta >= 0 else ""
+            ax_sp.text(x_sp[i], acc / 2,
+                       f"Δ{sign}{delta:.1f}pp", ha="center", va="center",
+                       fontsize=8, color="white", fontweight="bold")
+
+    ax_sp.set_xticks(x_sp)
+    ax_sp.set_xticklabels(sp_labels, fontsize=8.5)
+    ax_sp.set_ylabel("WMDP-Bio Accuracy (%)")
+    ax_sp.set_title("(A) System Prompt Ablation\n"
+                    "Null result — CIs fully overlap (±~2.5pp noise floor)",
+                    fontsize=11)
+    ax_sp.set_ylim(0, 100)
+    ax_sp.yaxis.grid(True, alpha=0.4, zorder=0)
+    ax_sp.set_axisbelow(True)
+
+    # Null result annotation
+    ax_sp.text(0.5, 0.08, "No significant effect\n(CIs overlap, Δ < 0.5pp)",
+               ha="center", va="bottom", transform=ax_sp.transAxes,
+               fontsize=8, style="italic", color="dimgray",
+               bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow", alpha=0.8))
+
+    # ── Right: CoT (P4.2) ────────────────────────────────────────────────────
+    cot_defs: list[tuple] = [("Baseline\n(no CoT)", base_conds["none"], COT_BLUE, False)]
+    if cot_invalid:
+        cot_defs.append(("CoT 32-tok\n[INVALID]", cot_invalid, COT_INVALID, True))
+    if cot_valid:
+        cot_defs.append(("CoT 512-tok\n[Valid]", cot_valid, COT_VALID, False))
+
+    cot_labels, cot_rows_sel, cot_colors, cot_h = zip(*cot_defs)
+    cot_accs, cot_ci_los, cot_ci_his = zip(*[_acc_ci(r) for r in cot_rows_sel])
+    x_cot = np.arange(len(cot_defs))
+
+    for i, (acc, color, hatch) in enumerate(zip(cot_accs, cot_colors, cot_h)):
+        ax_cot.bar(x_cot[i], acc, color=color, width=0.55, zorder=3,
+                   hatch="///" if hatch else "",
+                   edgecolor="grey" if hatch else color,
+                   alpha=0.7 if hatch else 0.9)
+
+    ax_cot.errorbar(x_cot, cot_accs, yerr=[list(cot_ci_los), list(cot_ci_his)],
+                    fmt="none", color="black", capsize=5, linewidth=1.8, zorder=4)
+    ax_cot.axhline(RANDOM_CHANCE * 100, color=RANDOM_COLOR, linestyle=":",
+                   linewidth=1.4, zorder=2)
+
+    for i, (acc, ci_h) in enumerate(zip(cot_accs, cot_ci_his)):
+        ax_cot.text(x_cot[i], acc + ci_h + 1.0,
+                    f"{acc:.1f}%", ha="center", va="bottom", fontsize=9, fontweight="bold")
+
+    if cot_valid and len(cot_accs) >= 3:
+        delta = cot_accs[-1] - cot_accs[0]
+        ax_cot.annotate(f"Δ={delta:+.1f}pp",
+                        xy=(x_cot[-1], cot_accs[-1]),
+                        xytext=(x_cot[-1] + 0.38, cot_accs[-1] + 10),
+                        fontsize=9, color=COT_VALID, fontweight="bold",
+                        arrowprops=dict(arrowstyle="->", color=COT_VALID, lw=1.5))
+
+    ax_cot.set_xticks(x_cot)
+    ax_cot.set_xticklabels(cot_labels, fontsize=8.5)
+    ax_cot.set_ylabel("WMDP-Bio Accuracy (%)")
+    ax_cot.set_title("(B) Chain-of-Thought Ablation\n"
+                     "Strong negative result — valid CoT −28.0pp vs baseline",
+                     fontsize=11)
+    ax_cot.set_ylim(0, 100)
+    ax_cot.yaxis.grid(True, alpha=0.4, zorder=0)
+    ax_cot.set_axisbelow(True)
+
+    import matplotlib.patches as mpatches
+    ax_cot.legend(
+        handles=[
+            mpatches.Patch(facecolor=COT_INVALID, hatch="///", edgecolor="grey",
+                           label="Hatched = invalid measurement"),
+            plt.Line2D([0], [0], color=RANDOM_COLOR, linestyle=":",
+                       label="Random chance (25%)"),
+        ],
+        loc="upper right", fontsize=8
+    )
+
+    fig.suptitle(
+        "Falcon3-7B WMDP-Bio Ablations (Phase 4) — n=1273, error bars = 95% Wilson CI",
+        fontsize=13, fontweight="bold",
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    _save(fig, "fig7_ablation_panel")
+
+
+# ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
 
@@ -389,6 +747,15 @@ def main():
     if not args.skip_cdf:
         print("Generating Figure 4 — CDF …")
         fig4_cdf_comparison(rows)
+
+    print("Generating Figure 5 — system prompt ablation …")
+    fig5_system_prompt_ablation(rows)
+
+    print("Generating Figure 6 — CoT ablation …")
+    fig6_cot_ablation(rows)
+
+    print("Generating Figure 7 — combined ablation panel …")
+    fig7_ablation_panel(rows)
 
     print(f"\nAll figures saved to: {FIGURES_DIR}")
 
