@@ -222,4 +222,9 @@ notebooks/logs_hf/*
 .ipynb_checkpoints/
 .claude/*
 
-/results/unlearning/*
+# /results/unlearning/*
+*.safetensors
+*.bin
+*.pth
+results/
+.DS_Store
