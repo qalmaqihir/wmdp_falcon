@@ -60,6 +60,7 @@ ARCHITECTURE-INDEPENDENCE NOTE:
 """
 
 import argparse
+import csv
 import sys
 import time
 from datetime import datetime
@@ -567,6 +568,15 @@ def post_unlearning_eval_and_save(
     out_dir = UNLEARNING_RESULTS_DIR / f"{args.method}_{timestamp}"
     save_checkpoint(model, tokenizer, out_dir, metadata)
     print(f"\n[saved] Checkpoint + metadata at: {out_dir}")
+
+    # Save full training history as CSV for plotting.
+    history_path = out_dir / "history.csv"
+    with open(history_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["step", "loss", "wmdp_acc"])
+        for step, loss_val, acc in history:
+            writer.writerow([step, loss_val, "" if acc is None else acc])
+    print(f"[saved] Training history at: {history_path}")
 
 
 # ===========================================================================

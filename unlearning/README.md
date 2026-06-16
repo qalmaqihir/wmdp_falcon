@@ -15,6 +15,7 @@ Goal: demonstrate the full measure → unlearn → re-measure pipeline.
 | `03_rmu_exercise.py` | **Exercise 03** — implement 4 TODOs (RMU) |
 | `04_quantization_exploration.py` | Educational — run before Exercise 05 |
 | `05_quantized_rmu_exercise.py` | **Exercise 05** — implement 2 TODOs (LoRA-RMU) |
+| `plot_history.py` | Plot loss + WMDP accuracy curves from saved `history.csv` files |
 
 ## Setup
 
@@ -79,6 +80,52 @@ python unlearning/01_ga_gd_exercise.py --method gd --steps 200 --full-eval
 
 Adds full 1273-sample eval at the end (~15–20 min extra). Gives a number comparable to the
 existing baseline from `experiments/run_wmdp_bio.py`.
+
+## Step 7 — Plot Training Curves
+
+Each completed run saves `history.csv` and `metadata.json` inside its checkpoint directory
+(`results/unlearning/<method>_<timestamp>/`). Use `plot_history.py` to visualise the curves.
+
+### Saved artifacts per run
+
+| File | Contents |
+|------|----------|
+| `history.csv` | `step, loss, wmdp_acc` — one row per training step; `wmdp_acc` blank except at `EVAL_EVERY` checkpoints |
+| `metadata.json` | Hyperparameters, pre/post accuracy, timestamps |
+| `model weights + tokenizer` | Full HF-format checkpoint, loadable with `load_model_and_tokenizer(path)` |
+
+### Plot commands
+
+```bash
+# Most recent run (default when no args):
+python unlearning/plot_history.py
+
+# Specific run:
+python unlearning/plot_history.py results/unlearning/ga_20240614_120000
+
+# Compare GA vs GD side-by-side (pass both dirs):
+python unlearning/plot_history.py \
+  results/unlearning/ga_<TIMESTAMP> \
+  results/unlearning/gd_<TIMESTAMP>
+
+# All runs overlaid:
+python unlearning/plot_history.py --all
+
+# Save to custom path:
+python unlearning/plot_history.py --all --out figures/unlearning_comparison.png
+```
+
+### What the plot shows
+
+- **Left panel — Loss vs Step**: raw loss per step + smoothed trend (dashed).
+  - GA: monotonically more negative (loss grows = model is pushed away from forget data).
+  - GD: oscillates (forget term pulls negative, retain term pulls positive) — the regularizer is working.
+- **Right panel — WMDP-bio Accuracy vs Step**: accuracy at each `EVAL_EVERY` checkpoint.
+  - Baseline at step 0 (pre-unlearning) marked automatically.
+  - 25% random-chance reference line drawn.
+  - Goal: accuracy drops toward 25% without general capability collapsing.
+
+Output saved to `figures/unlearning_<methods>.png` and `.pdf`.
 
 ## Expected Results Table (fill in as you run)
 
@@ -234,3 +281,5 @@ These exit cleanly on MPS with an explanatory message — no crash.
 | Gradient not flowing through hook | Do NOT detach `output[0]` in the hook — gradient must flow back through the live model |
 | `bitsandbytes` error on MPS | Expected — use `--backend bf16-lora` on M2 Mac |
 | LoRA adapter not saving | Check `peft_model.save_pretrained(path)` not `model.save_pretrained(path)` |
+| `No history.csv` error in `plot_history.py` | Run `01_ga_gd_exercise.py` to completion first — partial runs don't write the file |
+| `matplotlib` not found | `pip install matplotlib` in the venv |

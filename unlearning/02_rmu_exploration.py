@@ -99,7 +99,7 @@ def _load_real_samples() -> tuple[str, str]:
         print(f"[samples] forget — wmdp-bio MCQ fallback: {len(forget_text)} chars")
 
     print("[samples] Loading real retain sample ...")
-    ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="train", trust_remote_code=False)
+    ds = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", split="train", trust_remote_code=False)
     retain_text: str | None = None
     for row in ds:
         text = row.get("text", "").strip()
@@ -172,7 +172,7 @@ def section_forward_hooks(model, tokenizer, device, forget_sample: str) -> None:
     h = captured["h"]
     print()
     print(f"  Captured hidden state:")
-    print(f"    shape       : {tuple(h.shape)}  (batch=1, seq={h.shape[1]}, hidden={h.shape[2]})")
+    print(f"    shape       : {tuple(h.shape)}  (batch=1, seq={h.shape[0]}, hidden={h.shape[1]})")
     print(f"    dtype       : {h.dtype}")
     print(f"    mean        : {h.float().mean().item():.4f}")
     print(f"    std         : {h.float().std().item():.4f}")
@@ -206,8 +206,8 @@ def section_random_vector(hidden_size: int, device: torch.device) -> torch.Tenso
     print("  SECTION 3: Random Misdirection Vector")
     print(SEP_THICK)
 
-    gen = torch.Generator().manual_seed(42)
-    c = torch.randn(hidden_size, generator=gen, device=device)
+    gen = torch.Generator(device=device).manual_seed(42)
+    c = torch.randn(hidden_size, generator=gen, device="mps")#device) #Manually putting mps throws error; RuntimeError: Expected a 'mps' device type for generator but found 'cpu' 
     c = c / c.norm()
 
     print(f"  c = torch.randn({hidden_size})  (seeded for reproducibility)")
