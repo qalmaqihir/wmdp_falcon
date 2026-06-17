@@ -63,6 +63,7 @@ from itertools import cycle
 from pathlib import Path
 from typing import Callable
 
+import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
 from torch.optim import AdamW
@@ -78,11 +79,14 @@ from unlearning.config import (
 from unlearning.utils import (
     get_device,
     load_model_and_tokenizer,
-    build_forget_loader,
     build_retain_loader,
-    quick_wmdp_eval,
     full_wmdp_eval,
     save_checkpoint,
+)
+from unlearning.rmu_utils import (
+    make_disjoint_splits,
+    build_forget_loader_from_samples,
+    wmdp_eval_on_samples,
 )
 
 
@@ -90,7 +94,7 @@ from unlearning.utils import (
 # SECTION 0 — SETUP  (provided — do not modify)
 # ===========================================================================
 
-def setup(args) -> tuple:
+def setup(args, forget_samples: list) -> tuple:
     """Load model + frozen reference model, build data loaders, init optimizer."""
     print("\n" + "=" * 60)
     print("  Exercise 03 — RMU Unlearning")
@@ -110,11 +114,11 @@ def setup(args) -> tuple:
     print("[setup] Loading frozen reference model ...")
     frozen_model, _ = load_model_and_tokenizer(HF_MODEL_ID, device, frozen=True)
 
-    # Forget set: domain-specific text loaded via build_forget_loader().
-    # NOTE: the actual text content is handled by utils.py — no CBRN text in this file.
-    forget_loader = build_forget_loader(
+    # Forget set: pre-selected samples from make_disjoint_splits (disjoint from eval).
+    # NOTE: no CBRN text in this file — content handled by rmu_utils.
+    forget_loader = build_forget_loader_from_samples(
+        forget_samples,
         tokenizer,
-        n_samples=args.forget_size,
         max_len=MAX_SEQ_LEN,
         batch_size=BATCH_SIZE,
     )
@@ -141,11 +145,11 @@ def setup(args) -> tuple:
 # SECTION 1 — BASELINE EVAL  (provided — do not modify)
 # ===========================================================================
 
-def run_baseline(model, tokenizer, device, n_samples: int) -> dict:
+def run_baseline(model, tokenizer, device, eval_samples_list: list) -> dict:
     """Measure WMDP eval accuracy before any unlearning."""
     print("\n[baseline] Measuring pre-unlearning WMDP eval accuracy ...")
-    result = quick_wmdp_eval(model, tokenizer, device, n_samples=n_samples)
-    print(f"[baseline] WMDP eval accuracy (n={n_samples}): {result['accuracy']:.1%}")
+    result = wmdp_eval_on_samples(model, tokenizer, device, eval_samples_list)
+    print(f"[baseline] WMDP eval accuracy (n={len(eval_samples_list)}): {result['accuracy']:.1%}")
     print(f"           ({result['n_correct']}/{result['n_total']} correct, 25% = random chance)")
     return result
 
@@ -208,10 +212,16 @@ def make_hidden_state_hook(storage: dict, key: str) -> Callable:
         A forward hook function (module, input, output) -> None.
     """
     # ########## Complete the Implementation ##########
+    try:
+        def hook(module, _input, output):
+            storage[key] = output[0]
+        return hook
+    except Exception as e:
+        print(f"Error Occured while creating the forward hook...\n{str(e)}\n")
 
-    raise NotImplementedError(
-        "TODO 1: implement make_hidden_state_hook(). ~3 lines. See docstring above."
-    )
+    # raise NotImplementedError(
+    #     "TODO 1: implement make_hidden_state_hook(). ~3 lines. See docstring above."
+    # )
 
     # ##################################################
 
@@ -270,10 +280,16 @@ def rmu_forget_loss(
         Scalar MSE loss tensor with gradient.
     """
     # ########## Complete the Implementation ##########
+    rv = random_vec.to(hidden.dtype)
+    target = (alpha*rv).expand_as(hidden)
+    return F.mse_loss(hidden, target)
 
-    raise NotImplementedError(
-        "TODO 2: implement rmu_forget_loss(). ~3 lines. See docstring above."
-    )
+    # If you hit NaNs once you start running real steps (bf16 squares can overflow more easily than you'd think at higher alpha), swap the last line for:
+    # return F.mse_loss(hidden.float(), target.float())
+
+    # raise NotImplementedError(
+    #     "TODO 2: implement rmu_forget_loss(). ~3 lines. See docstring above."
+    # )
 
     # ##################################################
 
@@ -320,10 +336,11 @@ def rmu_retain_loss(
         Scalar MSE loss tensor (gradient flows only through hidden_live).
     """
     # ########## Complete the Implementation ##########
+    return F.mse_loss(hidden_live, hidden_frozen)
 
-    raise NotImplementedError(
-        "TODO 3: implement rmu_retain_loss(). ~1 line. See docstring above."
-    )
+    # raise NotImplementedError(
+    #     "TODO 3: implement rmu_retain_loss(). ~1 line. See docstring above."
+    # )
 
     # ##################################################
 
@@ -368,7 +385,7 @@ def train_rmu(
     layer_idx: int,
     alpha: float,
     beta: float,
-    eval_samples: int,
+    eval_samples_list: list,
 ) -> list[tuple]:
     """
     RMU training loop with two-pass hidden-state loss.
@@ -449,6 +466,7 @@ def train_rmu(
 
     # Step 1: build the fixed random misdirection vector
     # random_vec = build_rmu_random_vector(model.config.hidden_size, device)
+    random_vec = build_rmu_random_vector(model.config.hidden_size, device)
 
     # Step 2: register hooks on live and frozen model
     # live_store   = {}
@@ -457,10 +475,19 @@ def train_rmu(
     #                     make_hidden_state_hook(live_store, "h"))
     # frozen_handle = frozen_model.model.layers[layer_idx].register_forward_hook(
     #                     make_hidden_state_hook(frozen_store, "h"))
+    
+    live_store, frozen_store = {}, {}
+    live_handle=model.model.layers[layer_idx].register_forward_hook(make_hidden_state_hook(live_store, "h"))
+    frozen_handle= frozen_model.model.layers[layer_idx].register_forward_hook(make_hidden_state_hook(frozen_store,"h"))
+    
 
     # Step 3: infinite iterators over loaders
     # forget_iter = cycle(forget_loader)
     # retain_iter = cycle(retain_loader)
+    
+    forget_iter = cycle(forget_loader)
+    retain_iter=cycle(retain_loader)
+    
 
     # Step 4: training loop
     # history = []
@@ -496,10 +523,8 @@ def train_rmu(
     #         # Logging
     #         wmdp_acc = None
     #         if (step + 1) % EVAL_EVERY == 0:
-    #             model.eval()
-    #             r = quick_wmdp_eval(model, tokenizer, device, n_samples=eval_samples)
+    #             r = wmdp_eval_on_samples(model, tokenizer, device, eval_samples_list)
     #             wmdp_acc = r["accuracy"]
-    #             model.train()
     #
     #         print(f"Step {step+1}/{steps}  loss_f={loss_f.item():.4f}  "
     #               f"loss_r={loss_r.item():.6f}  total={total.item():.4f}")
@@ -510,12 +535,124 @@ def train_rmu(
     #     frozen_handle.remove()
     #
     # return history
+    history = []
+    model.train()
+    try:
+        for step in range(steps):
+            forget_batch={k:v.to(device) for k, v in next(forget_iter).items()}
+            retain_batch={k:v.to(device) for k,v in next(retain_iter).items()}
+            # Pass 1; live model on forget text. live_store["h"] gets gradient
+            _ =model(**forget_batch)
+            h_forget = live_store["h"] # saved for ref
+            
+            # Pass 2: frozen model on retain text, no_grad(). Detached anchor
+            with torch.no_grad():
+                _ = frozen_model(**retain_batch)
+            h_frozen_retrain = frozen_store["h"]
+            
+            # Pass 3: Live model on retain text,  overwrites live_stroe["h"]; but h_forget above already poiitns to the old tensor, so it;s safe 
+            _ = model(**retain_batch)
+            h_retain = live_store["h"]
+            
+            loss_f = rmu_forget_loss(h_forget, random_vec, alpha)
+            loss_r = rmu_retain_loss(h_retain, h_frozen_retrain)
+            total = loss_f + beta * loss_r
+            
+            optimizer.zero_grad()
+            total.backward()
+            optimizer.step()
+            
+            
+            wmdp_acc = None
+            if (step+1) % EVAL_EVERY == 0:
+                r = wmdp_eval_on_samples(model, tokenizer, device, eval_samples_list)
+                wmdp_acc = r["accuracy"]
+                
+            print(f"Step {step+1}/{steps}: Loss_f={loss_f.item():.5f}   "
+                  f"loss_r={loss_r.item():.5f} total={total.item():.5f}"
+                  + (f"   wmdp_acc={wmdp_acc:.2%}" if wmdp_acc is not None else ""))
+            history.append((step+1, loss_f.item(), loss_r.item(), total.item(), wmdp_acc))
+    finally:
+        live_handle.remove()
+        frozen_handle.remove()
+    
+    return history
 
-    raise NotImplementedError(
-        "TODO 4: implement train_rmu(). ~45 lines. See docstring above."
-    )
+    # raise NotImplementedError(
+    #     "TODO 4: implement train_rmu(). ~45 lines. See docstring above."
+    # )
 
     # ##################################################
+
+
+# ===========================================================================
+# SECTION 7a — PLOT TRAINING HISTORY
+# ===========================================================================
+
+def plot_history(
+    history: list[tuple],
+    pre_acc: float,
+    post_acc: float,
+    save_path: Path,
+) -> None:
+    """Plot RMU training curves and save to disk.
+
+    Args:
+        history:   List of (step, loss_f, loss_r, total, wmdp_acc_or_None).
+        pre_acc:   Baseline WMDP accuracy (before unlearning).
+        post_acc:  Post-unlearning WMDP accuracy.
+        save_path: Path to write the PNG.
+    """
+    steps   = [h[0] for h in history]
+    loss_f  = [h[1] for h in history]
+    loss_r  = [h[2] for h in history]
+    total   = [h[3] for h in history]
+
+    eval_steps = [h[0] for h in history if h[4] is not None]
+    eval_accs  = [h[4] for h in history if h[4] is not None]
+
+    n_panels = 3 if eval_steps else 2
+    fig, axes = plt.subplots(1, n_panels, figsize=(6 * n_panels, 4))
+    fig.suptitle("RMU Training Curves", fontsize=13, fontweight="bold")
+
+    # Panel 1: forget loss
+    ax = axes[0]
+    ax.plot(steps, loss_f, color="tab:red", linewidth=1.2, label="loss_f (forget)")
+    ax.set_xlabel("Step")
+    ax.set_ylabel("Loss")
+    ax.set_title("Forget Loss (MSE → random vector)")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    # Panel 2: retain loss + total
+    ax = axes[1]
+    ax.plot(steps, total,  color="tab:blue",  linewidth=1.4, label="total")
+    ax.plot(steps, loss_r, color="tab:green", linewidth=1.0, linestyle="--", label="loss_r (retain)")
+    ax.set_xlabel("Step")
+    ax.set_ylabel("Loss")
+    ax.set_title("Retain + Total Loss")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    # Panel 3 (optional): WMDP eval trajectory
+    if eval_steps:
+        ax = axes[2]
+        ax.plot(eval_steps, [a * 100 for a in eval_accs],
+                color="tab:purple", marker="o", linewidth=1.2, label="WMDP acc (mid-train)")
+        ax.axhline(pre_acc  * 100, color="gray",    linestyle="--", linewidth=1.0, label=f"Baseline {pre_acc:.1%}")
+        ax.axhline(post_acc * 100, color="tab:red", linestyle=":",  linewidth=1.0, label=f"Post-RMU {post_acc:.1%}")
+        ax.axhline(25.0, color="black", linestyle="-.", linewidth=0.8, label="Random 25%")
+        ax.set_xlabel("Step")
+        ax.set_ylabel("WMDP Accuracy (%)")
+        ax.set_title("WMDP Eval Accuracy Trajectory")
+        ax.set_ylim(0, 100)
+        ax.legend(fontsize=8)
+        ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
 
 
 # ===========================================================================
@@ -529,10 +666,11 @@ def post_unlearning_eval_and_save(
     pre_result: dict,
     history: list,
     args,
+    eval_samples_list: list,
 ) -> None:
     """Measure accuracy after unlearning, print delta, optionally run full eval."""
     print("\n[post-eval] Measuring post-unlearning WMDP eval accuracy ...")
-    post_result = quick_wmdp_eval(model, tokenizer, device, n_samples=args.eval_samples)
+    post_result = wmdp_eval_on_samples(model, tokenizer, device, eval_samples_list)
 
     pre_acc  = pre_result["accuracy"]
     post_acc = post_result["accuracy"]
@@ -574,15 +712,19 @@ def post_unlearning_eval_and_save(
         "model_id":        HF_MODEL_ID,
     }
 
-    eval_points = [(s, l, a) for (s, l, a) in history if a is not None]
+    eval_points = [(s, lf, lr, lt, a) for (s, lf, lr, lt, a) in history if a is not None]
     if eval_points:
         print("  Mid-training WMDP eval trajectory:")
-        for (step, loss, acc) in eval_points:
-            print(f"    step {step:>4}  loss={loss:.4f}  wmdp={acc:.1%}")
+        for (step, lf, lr, lt, acc) in eval_points:
+            print(f"    step {step:>4}  loss_f={lf:.4f}  loss_r={lr:.4f}  total={lt:.4f}  wmdp={acc:.1%}")
 
     out_dir = UNLEARNING_RESULTS_DIR / f"rmu_{timestamp}"
     save_checkpoint(model, tokenizer, out_dir, metadata)
     print(f"\n[saved] Checkpoint + metadata at: {out_dir}")
+
+    plot_path = out_dir / "rmu_training_curves.png"
+    plot_history(history, pre_result["accuracy"], post_acc, plot_path)
+    print(f"[saved] Training curves at: {plot_path}")
 
 
 # ===========================================================================
@@ -613,13 +755,23 @@ def main() -> None:
     if args.steps is None:
         args.steps = STEPS_RMU
 
-    model, frozen_model, tokenizer, forget_loader, retain_loader, optimizer, device = setup(args)
+    # Partition WMDP-bio into disjoint forget-train and eval sets before loading models.
+    # This prevents the eval from measuring direct disruption rather than generalized forgetting.
+    forget_samples_list, eval_samples_list = make_disjoint_splits(
+        forget_size=args.forget_size,
+        eval_size=args.eval_samples,
+        seed=42,
+    )
+
+    model, frozen_model, tokenizer, forget_loader, retain_loader, optimizer, device = setup(
+        args, forget_samples_list
+    )
 
     if args.skip_baseline:
         pre_result = {"accuracy": float("nan"), "n_correct": 0, "n_total": 0}
         print("[baseline] Skipped (--skip-baseline).")
     else:
-        pre_result = run_baseline(model, tokenizer, device, n_samples=args.eval_samples)
+        pre_result = run_baseline(model, tokenizer, device, eval_samples_list)
 
     print(f"\n[train] Starting RMU unlearning ({args.steps} steps, layer={args.layer}) ...")
     t0 = time.perf_counter()
@@ -636,13 +788,13 @@ def main() -> None:
         layer_idx=args.layer,
         alpha=args.alpha,
         beta=args.beta,
-        eval_samples=args.eval_samples,
+        eval_samples_list=eval_samples_list,
     )
 
     elapsed = time.perf_counter() - t0
     print(f"[train] Done in {elapsed/60:.1f} min ({elapsed/args.steps:.1f} s/step).")
 
-    post_unlearning_eval_and_save(model, tokenizer, device, pre_result, history, args)
+    post_unlearning_eval_and_save(model, tokenizer, device, pre_result, history, args, eval_samples_list)
 
 
 if __name__ == "__main__":
