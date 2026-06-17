@@ -1,8 +1,20 @@
-# Part 2: Can You Make Falcon3 Forget What It Knows? I Tried RMU.
+---
+title: "Part 2: Can You Make Falcon3 Forget What It Knows? I Tried RMU"
+author: "Jawad Haider"
+date: today
+format:
+  pdf:
+    toc: true
+    toc-depth: 2
+    fig-width: 6.5       # Sets default width to 6.5 inches
+    fig-height: 4.5      # Sets default height to 4.5 inches
+    fig-align: center    # Automatically centers every figure on the page
+---
 
+{{< pagebreak >}}
+
+# Part 2: Can You Make Falcon3 Forget What It Knows? I Tried RMU
 *Part 2 of the Falcon3 biosecurity series. Part 1 established that Falcon3-1B scores 40.1% and Falcon3-7B scores 70.9% on WMDP-bio, well above the 25% random baseline, and robust to system prompt changes. Now we apply Representation Misdirection Unlearning and find out what it actually takes to degrade a model's biosecurity knowledge at the representation level.*
-
-
 
 Part 1 ended with a clean null result: you cannot suppress Falcon3's demonstrated biosecurity knowledge by changing the system prompt. ±0.4 percentage points across three prompt conditions, all confidence intervals overlapping. The model's parametric knowledge is robust to surface-level instructional framing.
 
@@ -10,10 +22,7 @@ That finding motivates a different class of intervention. If behavioral guardrai
 
 This is what machine unlearning research is trying to answer. And it is a hard problem.
 
-
-
 ## What Is RMU?
-
 Representation Misdirection for Unlearning (RMU) was introduced alongside the WMDP benchmark in Li et al. (ICML 2024). The method operates directly on a model's internal representations rather than on its behavior.
 
 The core idea: take a frozen copy of the model (the reference), and fine-tune a "live" copy with two competing objectives.
@@ -28,10 +37,7 @@ The parameter α controls the balance. High α = retain constraint is strong, fo
 
 This is distinctly not refusal training. Refusal training teaches the model to say "I can't help with that"; a behavior-layer block. RMU degrades what the model *knows* at the representation level. A model with effective RMU applied would not know the answer to dangerous questions, not merely decline to say it.
 
-
-
 ## What I Did
-
 I applied RMU to `tiiuae/Falcon3-1B-Instruct` on an Apple M2 Max (MPS backend), running entirely locally via HuggingFace Transformers. The choice of 1B was practical: the 7B backward pass requires gradient checkpointing and substantially more memory than the 7B forward pass used in inference evals.
 
 **Hyperparameters:** steps=300, lr=5×10⁻⁵, layer=9, α=100, β=1.0
@@ -42,10 +48,7 @@ I applied RMU to `tiiuae/Falcon3-1B-Instruct` on an Apple M2 Max (MPS backend), 
 
 The forget and retain sets were sampled once with seed=42 and held fixed throughout training.
 
-
-
 ## What Happened
-
 Here is the training trajectory:
 
 | Step | Forget Loss | Retain Loss | WMDP Accuracy (n=50) |
@@ -65,19 +68,13 @@ At the final evaluation (step 300): **50 out of 50 samples were format failures.
 At steps 291 and 294, retain loss spiked to 404.0 and 100.0, respectively. Normal range throughout training was 0.1–1.0. These spikes indicate that the live model's representations had drifted catastrophically away from the frozen reference on benign (Wikitext) data, the retain constraint had collapsed entirely.
 
 ![](./results/unlearning/rmu_20260617_172240/rmu_training_curves.png)
-
-
-
 **The verdict: this is model collapse, not controlled unlearning.**
 
 The forget loss did converge cleanly (24.0 → ~0.18). RMU did misdirect the biosecurity representations. But the retain constraint failed to hold the rest of the model together. With α=100, the retain penalty was insufficient to prevent the optimization from destroying the model's general output distribution in the process of destroying its biosecurity representations.
 
 The result is a model that cannot write coherent text at all and not because it forgot biosecurity content, but because it forgot how to generate language.
 
----
-
 ## Why This Happened
-
 α calibration is the core engineering challenge in RMU, and Li et al. are explicit about this. Their published α=1200 for WMDP-bio on Llama 2-7B was the result of a tuning sweep run against live MMLU accuracy. They monitored general capability preservation and backed off when it degraded.
 
 I did not run that calibration loop. I set α=100 based on the paper's recommendation to "start high" and did not include live MMLU monitoring. For a 1B model with a different architecture, this was too aggressive.
@@ -88,10 +85,7 @@ The retain spikes at steps 291 and 294 are the signal that the retain loss compu
 
 There is also a subtler issue: our retain set was Wikitext-2, which consists of running prose. The WMDP-bio MCQ format (single letter A/B/C/D answers) is quite different. When the retain constraint only protects prose generation, the model's MCQ answering format can collapse independently. Using MMLU questions as the retain set would directly preserve the MCQ-format output distribution.
 
----
-
 ## What Clean Unlearning Looks Like
-
 For contrast, the Li et al. (2024) result on Llama 2-7B is:
 
 | Metric | Before RMU | After RMU |
@@ -107,24 +101,16 @@ That is the target. Our result missed it by collapsing the output distribution e
 
 The difference is α calibration and a live MMLU guard during training.
 
-
-
 ## What the Method Did Get Right
-
 It is worth being precise about what the run demonstrated.
-
 The forget loss converged. Starting at 24.0 (the model's hidden states were far from the random noise target), it reached ~0.18 by step 300. The misdirection objective was achieved like the Falcon3-1B's biosecurity representations were moved toward the random noise vector at layer 9.
 
 WMDP accuracy dropped from 48% to 0% in approximately 125 gradient steps. The drop was monotonic after step 50. The biosecurity knowledge degradation happened, as it just took the rest of the model's output capability with it.
 
 This is a meaningful result about method behavior: RMU is aggressive. It works fast on the forget direction. The retain constraint is the engineering challenge, not the forget direction. If anything, our run demonstrated that the forget component is robust even on a novel architecture; the retention side is what needs careful calibration.
 
-
-
 ## Next Steps
-
 The path to a clean unlearning result:
-
 **α calibration sweep:** Run α ∈ {0.5, 1, 2, 5, 10, 25} with a 50-step pilot at each setting. Measure: WMDP-eval accuracy, format failure rate, and spot-check MMLU at each checkpoint. Find the largest α that keeps format failures below 5% and MMLU within 3pp of baseline.
 
 **Live MMLU guard:** Add MMLU accuracy as a stopping criterion. Abort if MMLU drops more than 5pp from baseline at any checkpoint. This is the calibration loop Li et al. ran. We can reproduce it.
@@ -137,10 +123,7 @@ The path to a clean unlearning result:
 
 The publication target remains: before/after WMDP-bio delta + MMLU preservation on a Falcon3 model, using the same text-generation protocol as Phase 1. No one has published this. The path is clear. It is an engineering calibration problem, not a fundamental obstacle.
 
-
-
 ## Why This Matters for AI Safety
-
 The system prompt null result from Part 1 established that behavioral guardrails cannot reduce demonstrated parametric knowledge. This Part 2 result shows that representation-level unlearning *can* reach that knowledge, the misdirection happens, but doing it cleanly, without collateral damage, requires careful calibration.
 
 This is the actual engineering frontier of machine unlearning: not whether the method works in principle, but whether it can be applied reliably to novel architectures without destroying general capability in the process. Li et al. showed it on Llama 2-7B. Our result suggests the α parameter does not transfer across model families without retuning.
@@ -153,10 +136,7 @@ For AI safety practice, this has direct implications:
 
 These are tractable problems. Part 3 will address them.
 
-
-
 ## Reproducibility
-
 The RMU implementation and training logs are at:
 
 **GitHub: https://github.com/qalmaqihir/wmdp_falcon**
@@ -173,13 +153,12 @@ results/unlearning/rmu_20260617_172240/
 RMU hyperparameters: steps=300, lr=5e-5, layer=9, alpha=100, beta=1.0. Forget set = WMDP-bio (seed=42, disjoint from eval). Retain set = Wikitext-2-raw-v1.
 
 
+{{< pagebreak >}}
 
 ## References
-
 - Li, N. et al. (2024). The WMDP Benchmark: Measuring and Reducing Malicious Use with Unlearning. *ICML 2024*. arXiv:2403.03218
 - Zou, A. et al. (2023). Representation Engineering: A Top-Down Approach to AI Transparency. arXiv:2310.01405
 - TII (2024). Falcon3 Model Family. [huggingface.co/tiiuae](https://huggingface.co/tiiuae)
 
 
-
-*Jawad Haider · June 2026 · [Part 3: RMU Calibration on Falcon3 → Coming Next]()*
+*Jawad Haider · June 2026 · [Part 3: RMU Calibration on Falcon3 → Coming Next](placeholdder)*

@@ -1,7 +1,20 @@
-# Part 1: Does Falcon3 Know How to Make a Bioweapon? I Ran the Test.
+---
+title: "Part 1: Does Falcon3 Know How to Make a Bioweapon? I Ran the Test"
+author: "Jawad Haider"
+date: today
+format:
+  pdf:
+    toc: true
+    toc-depth: 2
+    fig-width: 6.5       # Sets default width to 6.5 inches
+    fig-height: 4.5      # Sets default height to 4.5 inches
+    fig-align: center    # Automatically centers every figure on the page
+---
+{{< pagebreak >}}
+
+# Part 1: Does Falcon3 Know How to Make a Bioweapon? I Ran the Test
 
 *First published WMDP-biosecurity results for the Falcon3 model family (1B–10B). What we found about open-weight models, scaling, system prompts, and what none of this actually tells us about real risk.*
-
 
 There is a benchmark called WMDP-bio. It contains 1,273 multiple-choice questions about biosecurity-relevant knowledge like pathogen characteristics, gain-of-function research, biosafety procedures, dual-use biology techniques. The questions are designed carefully: they measure knowledge that *correlates with* dangerous capability without themselves containing dangerous information.
 
@@ -14,7 +27,6 @@ So we ran them. All four sizes. Then ran baselines. Then ran ablations. Here is 
 
 
 ## Background: What Is WMDP and Why Does It Matter?
-
 WMDP (Weapons of Mass Destruction Proxy) is a benchmark from the Center for AI Safety, published at ICML 2024. The key word is *proxy*. It does not ask models to synthesize pathogens. It asks the kinds of questions you would need to answer correctly to be dangerous such as questions about toxin mechanisms, pathogen enhancement, containment evasion.
 
 A model that scores 70% on WMDP-bio has correctly answered 70% of proxy-hazardous biology MCQs. That is not the same as saying it will help someone build a bioweapon. It says: this model's parametric knowledge is broad enough that it lands in the upper tier of what these questions test.
@@ -26,7 +38,6 @@ Random chance on a 4-choice MCQ is 25%. A model at 25% knows nothing relevant. A
 
 
 ## What I Did
-
 **Models evaluated:**
 - Falcon3-1B (1.7B params), Falcon3-3B (3.2B), Falcon3-7B (7.5B), Falcon3-10B (10.3B) on full sweep
 - Llama3.1-8B (Meta), Qwen2.5-7B (Alibaba), Mistral-7B v0.3 (Mistral AI), Phi4-mini-3.8B (Microsoft) for baselines
@@ -39,10 +50,8 @@ The full code, config, and raw `.eval` logs are at: **[GitHub → YOUR_GITHUB_RE
 
 
 ## Part 1: Falcon3 Scaling Results
-
 The central question: does Falcon3 show predictable scaling on biosecurity-relevant knowledge?
-
-Yes. Strongly.
+Yes. Strongly
 
 | Model | Params | Accuracy | 95% CI | Correct / 1,273 | Wall time |
 |-------|--------|----------|--------|-----------------|-----------|
@@ -56,12 +65,11 @@ Yes. Strongly.
 The scaling signal is clean: +17.8pp from 1B to 3B, +13.0pp from 3B to 7B, +2.8pp from 7B to 10B. Strong log-linear fit from 1.7B to 7.5B, then diminishing returns above that. Even the 1.7B model is +15pp above random chance as it has real biosecurity knowledge.
 
 ![](./figures/fig2_scaling_falcon3.png)
-*[Figure 1: Log-linear scaling plot; Falcon3 accuracy vs. log₂(parameters), with published WMDP reference lines]*
+*Figure 1: Log-linear scaling plot; Falcon3 accuracy vs. log₂(parameters), with published WMDP reference lines*
 
 > **Quantization caveat:** Falcon3-1B runs Q8_0 (higher precision) versus Q4_K_M for all larger models. The 40.1% figure is marginally inflated relative to what Q4_K_M would give. The scaling slope is real; the 1B anchor point should be treated with this in mind.
 
 ## Part 2: How Does Falcon3 Stack Up Against the Field?
-
 At the 7–10B parameter tier, we ran four size-matched baselines.
 
 | Model | Family | Params | Accuracy | 95% CI |
@@ -74,7 +82,7 @@ At the 7–10B parameter tier, we ran four size-matched baselines.
 | Phi4-mini-3.8B | Microsoft | 3.8B | **62.1%** | 59.4–64.7% |
 
 ![](./figures/fig1_bar_all_models.png)
-*[Figure 2: Bar chart for all models sorted by accuracy, error bars = 95% CI, Falcon3 models in blue]*
+*Figure 2: Bar chart for all models sorted by accuracy, error bars = 95% CI, Falcon3 models in blue*
 
 **The headline finding:** Falcon3-7B, Qwen2.5-7B, and Llama3.1-8B cluster within a 1.8 percentage-point band. Their confidence intervals overlap. No model at this tier is statistically superior to the others. Falcon3 is competitive with SOTA despite being a newer, less-resourced release.
 
@@ -82,14 +90,10 @@ Falcon3-10B (73.7%) is the strongest single model in our cohort.
 
 **On efficiency:** The WMDP paper reports Mixtral-8x7B at 74.8% using logprob scoring. Falcon3-10B scores 73.7% under a typically-lower-scoring text-generation method. At roughly 4.5× fewer parameters than Mixtral, that is some meaningful result; even accounting for the protocol difference.
 
-
-
 ## Part 3: Can You Make Falcon3 Forget What It Knows?
-
 This is the safety-relevant question. I ran two ablations on Falcon3-7B.
 
 ### Ablation 1: System Prompts Our Null Result
-
 Can you suppress a model's demonstrated biosecurity knowledge by telling it to be careful?
 
 | Condition | System Prompt | Accuracy | Δ |
@@ -105,7 +109,6 @@ This is a genuine null result with a meaningful interpretation: **you cannot use
 That distinction matters for AI safety policy. Behavioral guardrails like system prompts, RLHF refusal training, and knowledge-level capability are separate things. A model can refuse to answer dangerous questions while still *knowing* the answers. This shapes what unlearning research (coming in Part 2) is actually trying to solve.
 
 ### Ablation 2: Chain-of-Thought, Strong Negative Finding
-
 Does asking Falcon3-7B to "think step by step" before answering improve accuracy?
 
 | Condition | max_tokens | Accuracy | Fmt-fail | Δ |
@@ -120,12 +123,10 @@ This is consistent with prior literature: chain-of-thought reasoning tends to hu
 Wall time: 84.5 minutes versus 6.1 minutes baseline **~14× slower for worse results**.
 
 ![](./figures/fig3_metric_heatmap.png)
-*[Figure 3: Metric heatmap; model × accuracy, format-fail%, tokens/sample, time/sample]*
-
+*Figure 3: Metric heatmap; model × accuracy, format-fail%, tokens/sample, time/sample*
 
 
 ## The Protocol Gap: Why You Cannot Directly Compare These Numbers to the WMDP Paper
-
 The WMDP paper (Li et al. 2024) uses **logprob scoring** via `lm-evaluation-harness`. This takes the highest log-probability assigned to the four answer tokens (A, B, C, D) no text generation required. Our evaluation uses **text generation** + regex extraction.
 
 Logprob evaluation typically yields **3–8 percentage points higher accuracy** than text-generation evaluation. The model cannot reason itself out of the correct answer; it only needs to assign higher probability to the correct token internally.
@@ -149,10 +150,7 @@ The WMDP paper's numbers serve as contextual reference lines, not apples-to-appl
 
 Falcon3-7B (70.9%, text-gen) clearly surpasses zephyr-7b (63.7%, logprob) despite using a typically lower-scoring method. The actual capability gap is likely larger than 7.2pp.
 
-
-
 ## What This Actually Means (and Doesn't)
-
 **What these results say:**
 - Falcon3's biosecurity-relevant parametric knowledge scales predictably with model size
 - At the 7–10B tier, Falcon3 is competitive with the strongest open-weight models (within statistical uncertainty)
@@ -168,10 +166,7 @@ The relationship between WMDP scores and actual biosecurity risk is an active re
 
 WMDP is a measurement tool, not a threat assessment. High scores should motivate deeper investigation; not panic, and not dismissal.
 
-
-
 ## Coming in Part 2: Machine Unlearning
-
 The natural follow-up: if Falcon3-7B absorbed this knowledge during pretraining, can we remove it?
 
 This is the research agenda for **Part 2**. I will apply Representation Misdirection for Unlearning (RMU; the method introduced alongside WMDP in Li et al. 2024) to Falcon3-7B and measure the result. The target: reduce WMDP-bio accuracy toward random chance while preserving general capability (MMLU, MT-Bench).
@@ -185,8 +180,6 @@ Part 2 will cover:
 - Asking whether the same architecture-agnostic RMU parameters that work on Llama 2 transfer to Falcon3
 
 Follow along for Part 2.
-
-
 
 ## Reproducibility
 
@@ -215,9 +208,9 @@ python experiments/plot_results.py
 Evaluation parameters: `temperature=0.0, seed=42, max_tokens=32` (baseline), full 1,273-sample test set.
 
 
+{{< pagebreak >}}
 
 ## References
-
 - Li, N. et al. (2024). The WMDP Benchmark: Measuring and Reducing Malicious Use with Unlearning. *ICML 2024*. arXiv:2403.03218
 - FutureHouse (2024). LAB-Bench: Measuring Capabilities of Language Models for Biology Research. arXiv:2407.10362
 - TII (2024). Falcon3 Model Family. [huggingface.co/tiiuae](https://huggingface.co/tiiuae)
