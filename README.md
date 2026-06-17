@@ -19,6 +19,25 @@ Evaluates [Falcon3](https://huggingface.co/collections/tiiuae/falcon3-67605ae035
 
 ---
 
+## Repository Branches
+
+| Branch | Contents |
+|--------|----------|
+| `main` | Stable results, figures, and analysis for the published Falcon3 × WMDP-Bio sweep |
+| `experiments/falcon-models` | Falcon model evaluation runs — raw `.eval` logs, per-model configs, and scripts |
+| `experiments/unlearning` | Unlearning experiments (Gradient Ascent, Gradient Difference, RMU) applied to Falcon3 |
+| `experiments/tutorials` | Inspect AI tutorial notebooks — good starting point for learning the framework |
+
+```bash
+# Example: explore unlearning experiments
+git checkout experiments/unlearning
+
+# Example: explore Inspect AI tutorials
+git checkout experiments/tutorials
+```
+
+---
+
 ## Key Results
 
 ### Falcon3 Scaling (n=1,273)
