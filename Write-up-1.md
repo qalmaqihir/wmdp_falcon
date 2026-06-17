@@ -14,7 +14,7 @@ format:
 
 # Part 1: Does Falcon3 Know How to Make a Bioweapon? I Ran the Test
 
-*First published WMDP-biosecurity results for the Falcon3 model family (1B–10B). What we found about open-weight models, scaling, system prompts, and what none of this actually tells us about real risk.*
+*This is the first work on WMDP-biosecurity results for the Falcon3 model family (1B–10B). What I found about open-weight models, scaling, system prompts, and what none of this actually tells us about real risk.*
 
 There is a benchmark called WMDP-bio. It contains 1,273 multiple-choice questions about biosecurity-relevant knowledge like pathogen characteristics, gain-of-function research, biosafety procedures, dual-use biology techniques. The questions are designed carefully: they measure knowledge that *correlates with* dangerous capability without themselves containing dangerous information.
 
@@ -24,8 +24,6 @@ Every major open-weight model family has published numbers on this benchmark. Ll
 
 So we ran them. All four sizes. Then ran baselines. Then ran ablations. Here is what we found.
 
-
-
 ## Background: What Is WMDP and Why Does It Matter?
 WMDP (Weapons of Mass Destruction Proxy) is a benchmark from the Center for AI Safety, published at ICML 2024. The key word is *proxy*. It does not ask models to synthesize pathogens. It asks the kinds of questions you would need to answer correctly to be dangerous such as questions about toxin mechanisms, pathogen enhancement, containment evasion.
 
@@ -34,8 +32,6 @@ A model that scores 70% on WMDP-bio has correctly answered 70% of proxy-hazardou
 The distinction matters enormously for interpretation. I will come back to it.
 
 Random chance on a 4-choice MCQ is 25%. A model at 25% knows nothing relevant. A model at 70% knows a lot.
-
-
 
 ## What I Did
 **Models evaluated:**
@@ -65,7 +61,7 @@ Yes. Strongly
 The scaling signal is clean: +17.8pp from 1B to 3B, +13.0pp from 3B to 7B, +2.8pp from 7B to 10B. Strong log-linear fit from 1.7B to 7.5B, then diminishing returns above that. Even the 1.7B model is +15pp above random chance as it has real biosecurity knowledge.
 
 ![](./figures/fig2_scaling_falcon3.png)
-*Figure 1: Log-linear scaling plot; Falcon3 accuracy vs. log₂(parameters), with published WMDP reference lines*
+*Figure 1: Falcon3 accuracy vs. log₂(parameters), with published WMDP reference lines*
 
 > **Quantization caveat:** Falcon3-1B runs Q8_0 (higher precision) versus Q4_K_M for all larger models. The 40.1% figure is marginally inflated relative to what Q4_K_M would give. The scaling slope is real; the 1B anchor point should be treated with this in mind.
 
@@ -82,7 +78,7 @@ At the 7–10B parameter tier, we ran four size-matched baselines.
 | Phi4-mini-3.8B | Microsoft | 3.8B | **62.1%** | 59.4–64.7% |
 
 ![](./figures/fig1_bar_all_models.png)
-*Figure 2: Bar chart for all models sorted by accuracy, error bars = 95% CI, Falcon3 models in blue*
+*Figure 2: All models sorted by accuracy, error bars = 95% CI, Falcon3 models in blue*
 
 **The headline finding:** Falcon3-7B, Qwen2.5-7B, and Llama3.1-8B cluster within a 1.8 percentage-point band. Their confidence intervals overlap. No model at this tier is statistically superior to the others. Falcon3 is competitive with SOTA despite being a newer, less-resourced release.
 
@@ -123,7 +119,7 @@ This is consistent with prior literature: chain-of-thought reasoning tends to hu
 Wall time: 84.5 minutes versus 6.1 minutes baseline **~14× slower for worse results**.
 
 ![](./figures/fig3_metric_heatmap.png)
-*Figure 3: Metric heatmap; model × accuracy, format-fail%, tokens/sample, time/sample*
+*Figure 3: model × accuracy, format-fail%, tokens/sample, time/sample*
 
 
 ## The Protocol Gap: Why You Cannot Directly Compare These Numbers to the WMDP Paper

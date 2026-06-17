@@ -161,4 +161,4 @@ RMU hyperparameters: steps=300, lr=5e-5, layer=9, alpha=100, beta=1.0. Forget se
 - TII (2024). Falcon3 Model Family. [huggingface.co/tiiuae](https://huggingface.co/tiiuae)
 
 
-*Jawad Haider · June 2026 · [Part 3: RMU Calibration on Falcon3 → Coming Next](placeholdder)*
+*[Part 3: RMU Calibration on Falcon3 → Coming Next](placeholdder)*
