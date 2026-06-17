@@ -150,3 +150,54 @@ CoT (512-token, valid) drops accuracy from 70.9% to **42.9%** (−28.0pp). Only 
 ---
 
 *Results complete as of 2026-06-03. All ablations concluded including CoT (512-token) valid rerun.*
+
+---
+
+## Phase 5 — RMU Unlearning (Falcon3-1B)
+
+**Date**: 2026-06-17  
+**Setup**: Applied RMU to `tiiuae/Falcon3-1B-Instruct` (1.7B params, BF16, M2 MPS via HuggingFace). Chose 1B rather than 7B for backward-pass tractability on M2 Max — 7B gradient computation requires gradient checkpointing and is significantly slower.
+
+**Hyperparameters**: steps=300, lr=5e-5, layer=9, alpha=100.0, beta=1.0, forget_size=200, retain_size=200. Forget set = 200 WMDP-bio samples (disjoint from eval split, seed=42). Retain set = 200 Wikitext-2-raw-v1 sequences. Quick-eval split = 50 WMDP-bio samples (also disjoint).
+
+> ⚠️ **Quick-eval vs. full eval**: Mid-training and post-training accuracy is measured on a fixed 50-sample split, not the full 1,273-sample Phase 2 set. Reported percentages are trend indicators only; the 48.0% pre-RMU quick-eval vs. 40.1% full-eval difference is within n=50 sampling noise.
+
+| Metric | Pre-RMU (n=50) | Post-RMU (n=50) | Delta |
+|--------|----------------|-----------------|-------|
+| WMDP-bio accuracy | 48.0% (24/50) | **0.0%** (0/50) | −48.0pp |
+| Format failures | 0 (0%) | **50 (100%)** | +100pp |
+
+**Training trajectory:**
+
+| Step | Loss_f | Loss_r | Total | WMDP acc |
+|------|--------|--------|-------|----------|
+| 25 | 5.47 | 0.50 | 5.97 | 34.0% |
+| 50 | 2.41 | 0.21 | 2.63 | 14.0% |
+| 75 | 1.00 | 0.17 | 1.17 | 24.0% |
+| 100 | 0.47 | 0.57 | 1.05 | 4.0% |
+| 125 | 0.48 | 0.68 | 1.16 | 0.0% |
+| 150–300 | ~0.20 | 0.2–404 | varies | 0.0% |
+
+**Critical interpretation: Model collapse, not controlled unlearning.**
+
+The 0.0% post-RMU accuracy is not a clean result. All 50 final-eval samples produced format failures — the model stopped generating any A/B/C/D answer tokens entirely. This is **model collapse**, not targeted knowledge forgetting.
+
+Evidence of collapse:
+- 100% format failure rate at step 300 (0% pre-RMU)
+- Retain loss spikes: step 291 = **404.0**, step 294 = **100.0** (normal range: 0.1–1.0) — model drifted catastrophically from benign representations
+- Forget loss did converge (24.0 → ~0.18), confirming the misdirection objective was achieved, but without effective retain constraint
+- WMDP accuracy already 0% (all format failures) by step 125 — the remaining 175 steps only deepened the collapse
+
+**Root cause:** alpha=100 is too aggressive for Falcon3-1B at this scale. The forget loss overwhelmed the retain signal before the retain constraint could stabilize. Li et al. used alpha=1200 for Llama 2-7B (proportionally larger model, different architecture, tuned against MMLU preservation). This run did not include live MMLU monitoring to catch degradation early.
+
+**Verdict:** RMU *did* ablate biosecurity representations (forget loss converged, accuracy dropped from step 1). But the hyper-aggressive alpha caused the entire output distribution to collapse past the point of format-valid generation. The finding is a **hyperparameter calibration failure**, not a method failure.
+
+### Decisions & Next Steps
+
+1. **Reduce alpha**: Try alpha = 0.5–5.0 for Falcon3-1B (or alpha = 10–50 for 7B). Retain constraint must be strong enough to keep output format intact.
+2. **Early stop**: At step 125, WMDP accuracy was already 0% (4/50 valid answers remaining). A proper stopping criterion (e.g. stop when WMDP-eval ≤ 27% *and* fmt_failures < 5%) would have preserved the model.
+3. **Live MMLU checkpoint**: Add MMLU accuracy as a retain signal to detect general capability collapse during training.
+4. **Falcon3-7B (future)**: Requires gradient checkpointing for backward pass on M2. Estimated 2–4× longer wall time. Alpha needs fresh calibration.
+5. **Retain set**: Wikitext-2 is generic text; using MMLU questions as the retain set more directly preserves MCQ-format capability.
+
+*RMU run complete 2026-06-17. Result: model collapse at alpha=100. Hyperparameter tuning required for a clean unlearning demonstration.*

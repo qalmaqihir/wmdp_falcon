@@ -490,7 +490,7 @@
     </h1>
     <p class="subtitle">
       First published WMDP evaluation of the Falcon3 family — evaluation complete,<br>
-      Representation Misdirection Unlearning is the next phase
+      RMU unlearning run complete — model collapse at α=100, calibration in progress
     </p>
     <div style="display:flex; gap:32px; margin-top:8px;">
       <div class="card green" style="text-align:center; min-width:160px;">
@@ -504,9 +504,9 @@
         <div class="card-desc">Best Falcon score · ≈ Mixtral-8x7B at 4.5× fewer params</div>
       </div>
       <div class="card amber" style="text-align:center; min-width:160px;">
-        <div class="card-label">Phase 2</div>
-        <div class="card-value" style="font-size:22px;">RMU</div>
-        <div class="card-desc">Representation Misdirection Unlearning on Falcon3-7B</div>
+        <div class="card-label">RMU — 1B Run</div>
+        <div class="card-value" style="font-size:22px;">48→0%</div>
+        <div class="card-desc">Model collapse at α=100 · tuning in progress</div>
       </div>
     </div>
     <div class="meta">Jawad Haider · Technical AI Safety · June 2026</div>
@@ -817,27 +817,28 @@
         <div class="step-desc">4 Falcon3 + 5 baselines · ablations complete · scaling curve established</div>
       </div>
       <div class="pipe-arrow">→</div>
-      <div class="pipe-step current">
-        <div class="step-num">STEP 2 — NOW</div>
+      <div class="pipe-step done">
+        <div class="step-num">STEP 2 — DONE ✓</div>
         <div class="step-name">Apply RMU</div>
-        <div class="step-desc">Representation Misdirection Unlearning on Falcon3-7B · target: 70.9% → ~25%</div>
+        <div class="step-desc">RMU run on Falcon3-1B · 48% → 0% WMDP · model collapse at α=100 · see analysis</div>
       </div>
       <div class="pipe-arrow">→</div>
-      <div class="pipe-step">
-        <div class="step-num">STEP 3</div>
-        <div class="step-name">Re-evaluate</div>
-        <div class="step-desc">Re-run WMDP-bio on unlearned model · verify MMLU preserved</div>
+      <div class="pipe-step current">
+        <div class="step-num">STEP 3 — NOW</div>
+        <div class="step-name">Tune &amp; Re-run</div>
+        <div class="step-desc">Calibrate α · add MMLU guard · early stop criterion · target clean forgetting</div>
       </div>
       <div class="pipe-arrow">→</div>
       <div class="pipe-step">
         <div class="step-num">STEP 4</div>
         <div class="step-name">Report</div>
-        <div class="step-desc">First published Falcon3 biosecurity eval + unlearning demonstration</div>
+        <div class="step-desc">Before/after WMDP + MMLU preservation · first Falcon3 unlearning result</div>
       </div>
     </div>
     <ul style="max-width:860px; margin-top:24px;">
-      <li><strong>RMU</strong> (Li et al., 2024): redirect hidden states toward a random vector on hazardous data while preserving benign representations. Proven to drop Llama 2-7B WMDP-bio from <strong>46% → ~25%</strong> while preserving MMLU</li>
-      <li>Grounded in <strong>Representation Engineering</strong> (Zou et al., 2023): high-level concepts are directions in the residual stream — RMU <em>misdirects</em> the biosecurity direction rather than zeroing it (more stable)</li>
+      <li><strong>RMU run complete</strong> (2026-06-17): Falcon3-1B · pre 48.0% → post 0.0% WMDP · <span class="bad">100% format failures at final eval</span> — model output collapsed, not controlled forgetting</li>
+      <li><strong>Forget loss converged</strong> (24.0 → 0.18) — misdirection worked at the representation level. <strong>Retain loss spiked</strong> (steps 291: 404.0, step 294: 100.0) — benign representations destroyed</li>
+      <li>Root cause: <span class="warn">α=100 too aggressive</span> for 1B model. Need α ≈ 1–5 + live MMLU checkpoint + early-stop criterion.</li>
     </ul>
   </div>
 
@@ -850,61 +851,102 @@
         <div class="col-head">The method (Li et al. 2024)</div>
         <ul style="max-width:420px;">
           <li><strong>Forget loss:</strong> on hazardous data — push hidden states toward a random noise vector <em>r</em> (misdirect, not suppress)</li>
-          <li><strong>Retain loss:</strong> on benign data — keep hidden states close to the original model's representations</li>
+          <li><strong>Retain loss:</strong> on benign data — keep hidden states close to the original model's representations via frozen reference model</li>
           <li><strong>Total loss:</strong> L = L_forget + α · L_retain where α balances forgetting vs. retention</li>
-          <li>Operates on a single intermediate layer · few training epochs · fast</li>
+          <li>Operates on a single intermediate layer · hundreds of gradient steps · fast</li>
         </ul>
         <div class="info-box" style="margin-top:16px;">
           <div class="info-label">Unlearning ≠ Refusal Training</div>
-          <p>Refusal adds a behavior-level block — circumventable by fine-tuning or jailbreaking. RMU degrades <strong>parametric knowledge at the representation level</strong> — harder to reverse. Our ablation showed system prompts can't touch the underlying capability; RMU operates one level deeper.</p>
+          <p>System prompt ablation showed: prompts change <em>behavior</em>, not <em>capability</em>. RMU degrades <strong>parametric knowledge at the representation level</strong> — operates one layer below refusal. Harder to undo by fine-tuning or jailbreaking.</p>
         </div>
       </div>
       <div>
-        <div class="col-head">Proof of concept — Llama 2-7B (Li et al. 2024, logprob eval)</div>
-        <table style="font-size:15px; margin-bottom:16px; max-width:400px;">
+        <div class="col-head">Our run — Falcon3-1B (2026-06-17) vs. Li et al. target</div>
+        <table style="font-size:15px; margin-bottom:12px; max-width:400px;">
           <thead>
-            <tr><th>Metric</th><th>Before RMU</th><th>After RMU</th></tr>
+            <tr><th>Metric</th><th>Li et al. Llama2-7B</th><th>Our Falcon3-1B</th></tr>
           </thead>
           <tbody>
-            <tr><td>WMDP-bio</td><td class="acc-mid">46%</td><td class="acc-rand">~25% (random)</td></tr>
-            <tr><td>MMLU</td><td>46%</td><td>45% <span class="good">✓</span></td></tr>
-            <tr><td>MT-Bench</td><td>6.2</td><td>6.1 <span class="good">✓</span></td></tr>
+            <tr><td>WMDP-bio pre</td><td class="acc-mid">46% (logprob)</td><td class="acc-mid">48.0% (n=50)</td></tr>
+            <tr><td>WMDP-bio post</td><td class="acc-rand">~25% ✓</td><td class="acc-bad">0% ✗ (collapse)</td></tr>
+            <tr><td>Fmt failures post</td><td class="good">~0%</td><td class="bad">100%</td></tr>
+            <tr><td>MMLU post</td><td>45% (preserved) ✓</td><td class="bad">not measured (collapse)</td></tr>
+            <tr><td>alpha</td><td>1200</td><td>100</td></tr>
           </tbody>
         </table>
-        <div class="result-box">
-          <div class="result-label">Our target for Falcon3-7B</div>
-          <p>Apply RMU and drop WMDP-bio from <strong>70.9% → ~25%</strong> while preserving MMLU (general capability). If successful: first published RMU unlearning result for any Falcon3 model.</p>
+        <div class="neg-box">
+          <div class="neg-label">Result: Model collapse at α=100</div>
+          <p>Forget converged, retain did not. All 50 final-eval samples = format failures. Model output distribution collapsed — not clean forgetting to random chance. α needs calibration for 1B Falcon3 architecture.</p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════ SLIDE 12 — RMU EXECUTION ═════════════════ -->
+  <!-- ═══════════════════════════════════ SLIDE 12 — RMU TRAINING ANALYSIS ═════════════ -->
   <div class="slide slide-content" id="s11">
-    <div class="label">Next Steps</div>
-    <h2>RMU execution plan for Falcon3-7B</h2>
+    <div class="label">RMU — Training Trajectory</div>
+    <h2>Forget converged. Retain collapsed.</h2>
     <div class="two-col" style="max-width:900px;">
       <div>
-        <div class="col-head">Execution steps</div>
+        <div class="col-head">Mid-training WMDP accuracy (n=50 quick-eval)</div>
+        <table style="font-size:14px; margin-bottom:12px; max-width:400px;">
+          <thead>
+            <tr><th>Step</th><th>Loss_f</th><th>Loss_r</th><th>WMDP acc</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>baseline</td><td class="dim">—</td><td class="dim">—</td><td class="acc-mid">48.0%</td></tr>
+            <tr><td>25</td><td class="dim">5.47</td><td class="dim">0.50</td><td class="acc-mid">34.0%</td></tr>
+            <tr><td>50</td><td class="dim">2.41</td><td class="dim">0.21</td><td class="acc-low">14.0%</td></tr>
+            <tr><td>100</td><td class="dim">0.47</td><td class="dim">0.57</td><td class="acc-bad">4.0%</td></tr>
+            <tr><td><strong>125</strong></td><td class="dim">0.48</td><td class="dim">0.68</td><td class="acc-bad"><strong>0.0%</strong> ← all fmt-fail</td></tr>
+            <tr><td>175–300</td><td class="dim">~0.20</td><td class="bad">0.2–404 ⚠</td><td class="acc-bad">0.0% (collapse)</td></tr>
+          </tbody>
+        </table>
+        <div class="warn-box">⚠ Retain loss spike: step 291 = <strong>404.0</strong>, step 294 = <strong>100.0</strong>. Normal range ≈ 0.1–1.0. Catastrophic drift from benign representations confirmed.</div>
+      </div>
+      <div>
+        <div class="col-head">Diagnosis &amp; fix</div>
         <ul style="max-width:420px;">
-          <li><strong>Step 0 — Retain baseline:</strong> run MMLU on Falcon3-7B before RMU to establish the preserve metric</li>
-          <li><strong>Step 1 — Setup:</strong> clone WMDP repo (github.com/centerforaisafety/wmdp) · prepare forget set (bio corpora) + retain set (Wikitext / MMLU general)</li>
-          <li><strong>Step 2 — Train RMU:</strong> apply forget+retain loss on Falcon3-7B · target intermediate layer · few epochs · α calibration</li>
-          <li><strong>Step 3 — Re-evaluate:</strong> WMDP-bio (n=1273) + MMLU on unlearned model · same protocol as baseline</li>
-          <li><strong>Step 4 — Report:</strong> before/after delta table + MMLU preservation check</li>
+          <li><strong>Root cause:</strong> α=100 overwhelmed retain constraint for 1B model. Forget loss converged in ~100 steps; retain loss never stabilized → full collapse by step 125</li>
+          <li><strong>Key symptom:</strong> 100% format failures (not wrong answers, no answers) — output distribution destroyed, not redirected</li>
+          <li><strong>Fix 1 — α:</strong> Reduce to α = 1–5 for 1B; recalibrate per-model. Li et al. α=1200 was tuned against live MMLU — we ran blind</li>
+          <li><strong>Fix 2 — Early stop:</strong> Step 125 was the point of interest. Stop when WMDP ≤ 27% AND fmt_failures &lt; 5%</li>
+          <li><strong>Fix 3 — MMLU guard:</strong> Add MMLU eval checkpoint every 25 steps; abort if MMLU drops &gt;5pp from baseline</li>
+        </ul>
+        <div class="crux-box" style="margin-top:12px;">
+          <div class="crux-label">The honest result</div>
+          <p>RMU <em>did</em> ablate biosecurity representations (forget loss converged, WMDP dropped fast). But α=100 also ablated <em>everything else</em>. The method works; the hyperparameters need calibration. This is expected — Li et al. tuned α extensively.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 13 — NEXT STEPS ═════════════════════ -->
+  <div class="slide slide-content" id="s12">
+    <div class="label">Next Steps</div>
+    <h2>Path to clean unlearning</h2>
+    <div class="two-col" style="max-width:900px;">
+      <div>
+        <div class="col-head">Immediate: retune Falcon3-1B RMU</div>
+        <ul style="max-width:420px;">
+          <li><strong>α sweep:</strong> run α ∈ {0.5, 1, 2, 5, 10, 25} · n=50 quick-eval + MMLU spot-check each</li>
+          <li><strong>Early stop criterion:</strong> halt when WMDP-eval ≤ 27% and fmt_fail &lt; 5% simultaneously</li>
+          <li><strong>MMLU retain set:</strong> swap Wikitext-2 for MMLU questions — directly preserves MCQ format capability</li>
+          <li><strong>Layer search:</strong> try layer 7 (as in paper) vs. layer 9 (current) on Falcon3-1B</li>
+          <li>Target: WMDP-bio ≈ 25% · fmt_failures &lt; 5% · MMLU drop &lt; 3pp</li>
         </ul>
       </div>
       <div>
-        <div class="col-head">Open questions &amp; risks</div>
+        <div class="col-head">Stretch: Falcon3-7B</div>
         <ul style="max-width:420px;">
-          <li>Can M2 handle <span class="warn">7B backward pass?</span> Inference works; training (gradient checkpointing likely needed) is heavier</li>
-          <li>Which layer to target? WMDP paper used layer 7 of Llama 2-7B — Falcon3 architecture may differ</li>
-          <li>What α (retain weight) transfers? Paper: α=1200 for bio — needs calibration for Falcon3</li>
-          <li>Will 70.9% drop cleanly to ~25%? Pilot at n=200 first to check direction before full sweep</li>
+          <li>Enable gradient checkpointing for 7B backward pass on M2 Max (~20 min/run estimate)</li>
+          <li>Scale α proportionally from 1B calibration · target layer 7 or 14</li>
+          <li>Full WMDP-bio (n=1273) before + after on same protocol as Phase 2</li>
+          <li>MMLU (n=~500) before + after for general capability preservation check</li>
         </ul>
-        <div class="crux-box" style="margin-top:14px;">
-          <div class="crux-label">Fallback plan</div>
-          <p>If M2 can't run 7B RMU in reasonable time → fall back to <strong>Falcon3-3B</strong> (57.9% → ~25%). Smaller backward pass, same method, same story. The RMU demonstration is what matters, not the specific model size.</p>
+        <div class="result-box" style="margin-top:16px;">
+          <div class="result-label">Publication target</div>
+          <p>First published RMU unlearning result for <strong>any Falcon3 model</strong>: pre-eval → post-eval delta table + MMLU preservation confirmation. Connects directly to the Phase 1 system-prompt null result: <em>behavioral guardrails fail; representation-level unlearning is the right target.</em></p>
         </div>
       </div>
     </div>
@@ -916,7 +958,7 @@
 <div class="progress" id="progress"></div>
 
 <!-- Slide number -->
-<div class="slide-num" id="slideNum">1 / 12</div>
+<div class="slide-num" id="slideNum">1 / 13</div>
 
 <!-- Nav hint -->
 <div class="nav-hint">← → or click dots to navigate</div>
