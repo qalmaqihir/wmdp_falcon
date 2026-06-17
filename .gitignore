@@ -217,8 +217,14 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-.claude
+notebooks/logs/*
+notebooks/logs_hf/*
+.ipynb_checkpoints/
+.claude/*
 
-/notebooks/logs/*
-/notebooks/logs_hf/*
-
+# /results/unlearning/*
+*.safetensors
+*.bin
+*.pth
+results/
+.DS_Store
