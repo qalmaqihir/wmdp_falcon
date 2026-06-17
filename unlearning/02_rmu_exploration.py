@@ -207,7 +207,7 @@ def section_random_vector(hidden_size: int, device: torch.device) -> torch.Tenso
     print(SEP_THICK)
 
     gen = torch.Generator(device=device).manual_seed(42)
-    c = torch.randn(hidden_size, generator=gen, device="mps")#device) #Manually putting mps throws error; RuntimeError: Expected a 'mps' device type for generator but found 'cpu' 
+    c = torch.randn(hidden_size, generator=gen, device="mps")#device) #Manually putting mps otherwise throws error; RuntimeError: Expected a 'mps' device type for generator but found 'cpu' 
     c = c / c.norm()
 
     print(f"  c = torch.randn({hidden_size})  (seeded for reproducibility)")
