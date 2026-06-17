@@ -228,3 +228,4 @@ notebooks/logs_hf/*
 *.pth
 results/
 .DS_Store
+notebooks/logs_hf/*
