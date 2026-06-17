@@ -34,7 +34,7 @@
   ```
   Confirmed: **1273 samples**
 - [x] `P0.5` Verify Inspect AI version: `inspect --version`  (confirmed 0.3.x)
-- [ ] `P0.6` Pin exact package versions to `requirements.txt` *(do after all runs)*:
+- [x] `P0.6` Pin exact package versions to `requirements.txt` *(do after all runs)*:
   ```bash
   pip freeze | grep -E "inspect|transformers|torch|datasets|pandas|matplotlib|scipy|numpy" > requirements.txt
   ```
@@ -103,7 +103,7 @@ Run sequentially (M2 can't parallelize two Ollama models well). All 4 completed 
 - [x] `P2.2` **Falcon3-3B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:3b`
 - [x] `P2.3` **Falcon3-7B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:7b`
 - [x] `P2.4` **Falcon3-10B** full run: `python experiments/run_wmdp_bio.py --model ollama/falcon3:10b`
-- [ ] `P2.5` Compute scaling slope after Phase 3 complete (run `analyze_results.py`)
+- [x] `P2.5` Compute scaling slope after Phase 3 complete (run `analyze_results.py`)
 
 > **Note**: Falcon3-1B uses Q8_0 (higher precision) vs. Q4_K_M for 3B/7B/10B — document as confound in scaling analysis.
 
@@ -205,19 +205,19 @@ Full output: `results/LITERATURE_COMPARISON.md`
 
 ## Phase 6 — Analysis & Reporting (1 hr)
 
-- [ ] `P6.1` Run `python experiments/analyze_results.py` → final CSV + markdown table
-- [ ] `P6.2` Run `python experiments/plot_results.py` → all 4 figures
-- [ ] `P6.3` Compute key findings:
+- [x] `P6.1` Run `python experiments/analyze_results.py` → final CSV + markdown table
+- [x] `P6.2` Run `python experiments/plot_results.py` → all 4 figures
+- [x] `P6.3` Compute key findings:
   - Does Falcon3 scale predictably? (R² of log-linear fit)
   - How does Falcon3-7B compare to Llama3.1-8B at same parameter budget?
   - Does DeepSeek-R1 reasoning improve WMDP-bio accuracy?
   - What is the refusal rate for each model on WMDP-bio questions?
-- [ ] `P6.4` Write `results/FINDINGS.md`:
+- [x] `P6.4` Write `results/FINDINGS.md`:
   - 3-5 bullet headline findings
   - Results table with 95% CIs
   - Figures embedded
   - Caveats: M2 local inference, Ollama quantization level, no logprob scoring
-- [ ] `P6.5` Update `PROJECT_LOG.md` with today's experimental results
+- [x] `P6.5` Update `PROJECT_LOG.md` with today's experimental results
 
 ---
 
@@ -225,7 +225,7 @@ Full output: `results/LITERATURE_COMPARISON.md`
 
 So any researcher can replicate.
 
-- [ ] `P7.1` Final `requirements.txt` with pinned versions
+- [x] `P7.1` Final `requirements.txt` with pinned versions
 - [ ] `P7.2` `reproduce.sh` — one-command replication script:
   ```bash
   #!/bin/bash
@@ -237,7 +237,7 @@ So any researcher can replicate.
   python experiments/analyze_results.py
   python experiments/plot_results.py
   ```
-- [ ] `P7.3` Git commit everything to `falcon_eval_wmdp` repo
+- [x] `P7.3` Git commit everything to `falcon_eval_wmdp` repo
 - [ ] `P7.4` Tag commit: `git tag v1.0-wmdp-bio-sweep`
 
 ---

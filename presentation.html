@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Falcon3 Biosecurity Evals — Results &amp; RMU</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0f1117;
+    color: #e8eaf0;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  .deck {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 80px;
+    opacity: 0;
+    transform: translateX(40px);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    pointer-events: none;
+  }
+
+  .slide.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: all;
+  }
+
+  .slide.exit {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+
+  /* Slide types */
+  .slide-title { background: linear-gradient(135deg, #0f1117 0%, #1a1f2e 100%); }
+  .slide-content { background: #13161f; align-items: flex-start; }
+  .slide-split { background: #13161f; }
+
+  /* Accent bar */
+  .slide-content::before, .slide-split::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px; height: 100%;
+    background: linear-gradient(180deg, #6c63ff, #00c9a7);
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* Typography */
+  .label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #6c63ff;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-size: 48px;
+    font-weight: 700;
+    line-height: 1.15;
+    color: #ffffff;
+    margin-bottom: 20px;
+  }
+
+  h2 {
+    font-size: 34px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 28px;
+    line-height: 1.2;
+  }
+
+  h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #00c9a7;
+    margin-bottom: 12px;
+    margin-top: 24px;
+  }
+
+  .subtitle {
+    font-size: 20px;
+    color: #8890a4;
+    line-height: 1.5;
+    max-width: 700px;
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .meta {
+    font-size: 14px;
+    color: #555d70;
+    margin-top: 40px;
+    letter-spacing: 1px;
+  }
+
+  /* Bullets */
+  ul { list-style: none; width: 100%; max-width: 800px; }
+  ul li {
+    font-size: 19px;
+    line-height: 1.6;
+    color: #c8cdd8;
+    padding: 10px 0 10px 32px;
+    position: relative;
+    border-bottom: 1px solid #1e2330;
+  }
+  ul li:last-child { border-bottom: none; }
+  ul li::before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    color: #6c63ff;
+    font-size: 14px;
+    top: 13px;
+  }
+  ul li strong { color: #ffffff; }
+  ul li .dim { color: #555d70; font-size: 15px; }
+  ul li .good { color: #00c9a7; font-weight: 600; }
+  ul li .warn { color: #f0a500; font-weight: 600; }
+  ul li .bad  { color: #ff5c5c; font-weight: 600; }
+
+  /* Cards / grid */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    width: 100%;
+    max-width: 900px;
+    margin-top: 8px;
+  }
+
+  .card {
+    background: #1a1f2e;
+    border: 1px solid #252b3b;
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+
+  .card .card-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #555d70;
+    margin-bottom: 8px;
+  }
+
+  .card .card-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .card .card-desc {
+    font-size: 13px;
+    color: #6c7385;
+    line-height: 1.4;
+  }
+
+  .card.highlight {
+    border-color: #6c63ff;
+    background: #1a1830;
+  }
+  .card.highlight .card-value { color: #6c63ff; }
+
+  .card.green { border-color: #00c9a7; background: #0e1f1c; }
+  .card.green .card-value { color: #00c9a7; }
+
+  .card.amber { border-color: #f0a500; background: #1e1a0e; }
+  .card.amber .card-value { color: #f0a500; }
+
+  /* Table */
+  table {
+    width: 100%;
+    max-width: 820px;
+    border-collapse: collapse;
+    font-size: 16px;
+  }
+  thead th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #555d70;
+    border-bottom: 2px solid #252b3b;
+  }
+  tbody td {
+    padding: 12px 14px;
+    color: #c8cdd8;
+    border-bottom: 1px solid #1e2330;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: #1a1f2e; }
+  .acc-high { color: #00c9a7; font-weight: 700; }
+  .acc-mid  { color: #f0a500; font-weight: 700; }
+  .acc-low  { color: #6c7385; }
+  .acc-rand { color: #555d70; font-style: italic; }
+  .acc-bad  { color: #ff5c5c; font-weight: 700; }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+  }
+  .tag-new  { background: #1a1830; color: #6c63ff; border: 1px solid #6c63ff; }
+  .tag-pub  { background: #0e1f1c; color: #00c9a7; border: 1px solid #00c9a7; }
+  .tag-warn { background: #1e1a0e; color: #f0a500; border: 1px solid #f0a500; }
+  .tag-bad  { background: #1e1010; color: #ff5c5c; border: 1px solid #ff5c5c; }
+
+  /* Two-column layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .col-head {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #555d70;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #252b3b;
+  }
+
+  /* Pipeline diagram */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    max-width: 860px;
+    margin-top: 8px;
+  }
+  .pipe-step {
+    flex: 1;
+    background: #1a1f2e;
+    border: 1px solid #252b3b;
+    border-radius: 10px;
+    padding: 18px 16px;
+    text-align: center;
+  }
+  .pipe-step .step-num {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #6c63ff;
+    margin-bottom: 6px;
+  }
+  .pipe-step .step-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 4px;
+  }
+  .pipe-step .step-desc {
+    font-size: 12px;
+    color: #555d70;
+    line-height: 1.4;
+  }
+  .pipe-arrow {
+    font-size: 24px;
+    color: #6c63ff;
+    padding: 0 10px;
+    flex-shrink: 0;
+  }
+  .pipe-step.current { border-color: #00c9a7; background: #0e1f1c; }
+  .pipe-step.current .step-num { color: #00c9a7; }
+  .pipe-step.done { border-color: #2a4a3e; background: #0d1a16; }
+  .pipe-step.done .step-num { color: #2a8a6f; }
+  .pipe-step.done .step-name { color: #5a8070; }
+  .pipe-step.done .step-desc { color: #2d4a40; }
+
+  /* Progress dots */
+  .progress {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+  }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #252b3b;
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+  .dot.active { background: #6c63ff; width: 22px; border-radius: 4px; }
+
+  /* Navigation hint */
+  .nav-hint {
+    position: fixed;
+    bottom: 28px;
+    right: 40px;
+    font-size: 12px;
+    color: #333a4d;
+    letter-spacing: 1px;
+  }
+
+  /* Slide number */
+  .slide-num {
+    position: fixed;
+    top: 24px;
+    right: 40px;
+    font-size: 12px;
+    color: #333a4d;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+
+  /* Quote block */
+  .quote {
+    border-left: 3px solid #6c63ff;
+    padding: 16px 24px;
+    background: #1a1830;
+    border-radius: 0 8px 8px 0;
+    margin: 20px 0;
+    max-width: 800px;
+    font-size: 18px;
+    color: #c8cdd8;
+    line-height: 1.6;
+    font-style: italic;
+  }
+
+  /* Crux highlight box */
+  .crux-box {
+    background: #1a1830;
+    border: 2px solid #6c63ff;
+    border-radius: 12px;
+    padding: 20px 28px;
+    max-width: 800px;
+    width: 100%;
+    margin-top: 16px;
+  }
+  .crux-box .crux-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #6c63ff;
+    margin-bottom: 8px;
+  }
+  .crux-box p {
+    font-size: 17px;
+    color: #c8cdd8;
+    line-height: 1.6;
+  }
+  .crux-box strong { color: #ffffff; }
+
+  /* Result box — green variant */
+  .result-box {
+    background: #0e1f1c;
+    border: 2px solid #00c9a7;
+    border-radius: 12px;
+    padding: 20px 28px;
+    max-width: 800px;
+    width: 100%;
+    margin-top: 16px;
+  }
+  .result-box .result-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #00c9a7;
+    margin-bottom: 8px;
+  }
+  .result-box p {
+    font-size: 17px;
+    color: #c8cdd8;
+    line-height: 1.6;
+  }
+  .result-box strong { color: #ffffff; }
+
+  /* Inline warning box */
+  .warn-box {
+    background: #1e1a0e;
+    border: 1px solid #f0a500;
+    border-radius: 8px;
+    padding: 10px 16px;
+    max-width: 820px;
+    width: 100%;
+    margin-top: 12px;
+    font-size: 13px;
+    color: #b8901a;
+    line-height: 1.5;
+  }
+  .warn-box strong { color: #f0a500; }
+
+  /* Mini info box (neutral) */
+  .info-box {
+    background: #1a1f2e;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 10px;
+  }
+  .info-box .info-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #555d70;
+    margin-bottom: 6px;
+  }
+  .info-box p { font-size: 14px; color: #c8cdd8; line-height: 1.5; }
+  .info-box p strong { color: #ffffff; }
+
+  /* Mini negative result box */
+  .neg-box {
+    background: #1e1a0e;
+    border: 1px solid #f0a500;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 10px;
+  }
+  .neg-box .neg-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #f0a500;
+    margin-bottom: 6px;
+  }
+  .neg-box p { font-size: 14px; color: #c8cdd8; line-height: 1.5; }
+  .neg-box p strong { color: #ffffff; }
+
+  /* WMDP scale bar */
+  .scale-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 5px 0;
+    width: 100%;
+  }
+  .scale-label { font-size: 13px; color: #8890a4; width: 210px; flex-shrink: 0; }
+  .scale-bar-wrap { flex: 1; background: #1a1f2e; border-radius: 4px; height: 26px; overflow: hidden; position: relative; }
+  .scale-bar { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 10px; font-size: 12px; font-weight: 700; color: #fff; transition: width 0.8s ease; }
+  .scale-bar.random { background: #252b3b; }
+  .scale-bar.low    { background: #6c63ff; }
+  .scale-bar.mid    { background: #f0a500; }
+  .scale-bar.high   { background: #00c9a7; }
+  .scale-bar.ref    { background: #455068; }
+  .scale-pct { font-size: 13px; font-weight: 700; width: 52px; text-align: right; flex-shrink: 0; }
+
+  /* Emoji icons for emphasis */
+  .icon { font-size: 28px; margin-bottom: 8px; }
+
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+  <!-- ═══════════════════════════════════ SLIDE 1 — TITLE ═══════════════════════ -->
+  <div class="slide slide-title active" id="s0">
+    <div class="label">AI Safety Project — Discussion Presentation · June 2026</div>
+    <h1 style="text-align:center; max-width:820px;">
+      Falcon3 Biosecurity Evals:<br>Results &amp; RMU
+    </h1>
+    <p class="subtitle">
+      First published WMDP evaluation of the Falcon3 family — evaluation complete,<br>
+      Representation Misdirection Unlearning is the next phase
+    </p>
+    <div style="display:flex; gap:32px; margin-top:8px;">
+      <div class="card green" style="text-align:center; min-width:160px;">
+        <div class="card-label">Falcon3-7B</div>
+        <div class="card-value">70.9%</div>
+        <div class="card-desc">WMDP-bio · n=1273 · text-gen eval</div>
+      </div>
+      <div class="card highlight" style="text-align:center; min-width:160px;">
+        <div class="card-label">Falcon3-10B</div>
+        <div class="card-value">73.7%</div>
+        <div class="card-desc">Best Falcon score · ≈ Mixtral-8x7B at 4.5× fewer params</div>
+      </div>
+      <div class="card amber" style="text-align:center; min-width:160px;">
+        <div class="card-label">Phase 2</div>
+        <div class="card-value" style="font-size:22px;">RMU</div>
+        <div class="card-desc">Representation Misdirection Unlearning on Falcon3-7B</div>
+      </div>
+    </div>
+    <div class="meta">Jawad Haider · Technical AI Safety · June 2026</div>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 2 — MOTIVATION ═════════════════ -->
+  <div class="slide slide-content" id="s1">
+    <div class="label">Motivation</div>
+    <h2>Why measure biosecurity risk in LLMs?</h2>
+    <ul style="max-width:820px;">
+      <li>Open-weight models are <strong>freely downloadable, fine-tunable, and uncontrolled</strong> — safety alignment can be stripped out post-download</li>
+      <li>2025 novice uplift studies: LLMs now raise novice biology performance <strong>to expert baseline</strong> on dual-use tasks (virology troubleshooting, molecular cloning)</li>
+      <li>VCT benchmark: OpenAI o3 <strong>outperforms 94% of expert virologists</strong> on virology knowledge — frontier models already exceed most specialists</li>
+      <li>The <strong>WMDP paper</strong> (Li et al., ICML 2024) introduced the benchmark and RMU unlearning method — we build directly on this work</li>
+      <li>Our finding: Falcon3-7B scores <span class="warn">70.9%</span> on WMDP-bio — far above the 25% random baseline, approaching frontier at the &lt;10B parameter scale</li>
+    </ul>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 3 — GAP FILLED ═════════════════ -->
+  <div class="slide slide-content" id="s2">
+    <div class="label">Research Gap — Filled</div>
+    <h2>We filled the Falcon3 biosecurity gap</h2>
+    <ul style="max-width:820px; margin-bottom:24px;">
+      <li><strong>Falcon3</strong> (TII, Dec 2024) = <span class="good">#1 ranked open-weight family on HuggingFace &lt;13B leaderboard</span> — widely used, widely deployed</li>
+      <li>Llama, Mistral, Qwen, DeepSeek all had published WMDP scores. <span class="warn">Falcon3 had none.</span></li>
+      <li>We ran all 4 Falcon3 sizes (1B → 3B → 7B → 10B) on the full WMDP-bio test set (n=1,273 each) — <strong>first published evaluation of this family</strong></li>
+      <li>Also benchmarked 5 size-matched models (Llama3.1-8B, Qwen2.5-7B, Mistral-7B, Phi4-mini-3.8B) for peer comparison at the 7–8B tier</li>
+    </ul>
+    <div class="result-box">
+      <div class="result-label">Key Result</div>
+      <p>Strong monotonic scaling from <strong>40.1%</strong> (1B) to <strong>73.7%</strong> (10B). Falcon3-7B (70.9%) is competitive with same-size SOTA. System prompt framing has <strong>no effect</strong> on demonstrated capability. <strong>RMU unlearning is the immediate next step.</strong></p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 4 — WMDP EXPLAINED ══════════════ -->
+  <div class="slide slide-content" id="s3">
+    <div class="label">The Benchmark</div>
+    <h2>What is WMDP?</h2>
+    <div class="two-col" style="max-width:900px; margin-bottom:16px;">
+      <div>
+        <div class="col-head">The dataset</div>
+        <ul>
+          <li><strong>3,668 MCQ</strong> total: bio (1,273) · chem (585) · cyber (1,810)</li>
+          <li>Expert-filtered — no directly actionable content, pure <em>proxy</em> measure</li>
+          <li>4 answer choices → <strong>25% random baseline</strong></li>
+          <li>Hosted on HuggingFace as <code style="color:#6c63ff">cais/wmdp</code></li>
+          <li><span class="warn">Protocol note:</span> Li et al. used logprob scoring; we use text-gen + regex — scores are not directly comparable to the paper</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-head">Our text-gen results (bio, n=1273)</div>
+        <div class="scale-row"><span class="scale-label">Random baseline</span><div class="scale-bar-wrap"><div class="scale-bar random" style="width:25%">25%</div></div><span class="scale-pct" style="color:#555d70">25.0%</span></div>
+        <div class="scale-row"><span class="scale-label">Falcon3-1B</span><div class="scale-bar-wrap"><div class="scale-bar low" style="width:40%">40.1%</div></div><span class="scale-pct" style="color:#6c63ff">40.1%</span></div>
+        <div class="scale-row"><span class="scale-label">Falcon3-3B</span><div class="scale-bar-wrap"><div class="scale-bar mid" style="width:58%">57.9%</div></div><span class="scale-pct" style="color:#f0a500">57.9%</span></div>
+        <div class="scale-row"><span class="scale-label">Falcon3-7B</span><div class="scale-bar-wrap"><div class="scale-bar high" style="width:71%">70.9%</div></div><span class="scale-pct" style="color:#00c9a7">70.9%</span></div>
+        <div class="scale-row"><span class="scale-label">Falcon3-10B</span><div class="scale-bar-wrap"><div class="scale-bar high" style="width:74%">73.7%</div></div><span class="scale-pct" style="color:#00c9a7">73.7%</span></div>
+        <div class="scale-row"><span class="scale-label" style="color:#455068;">GPT-4 (logprob †)</span><div class="scale-bar-wrap"><div class="scale-bar ref" style="width:82%">82.2% †</div></div><span class="scale-pct" style="color:#455068">82.2%</span></div>
+        <p style="font-size:11px; color:#455068; margin-top:8px;">† Li et al. 2024 logprob eval — reference only, different protocol</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 5 — INFRASTRUCTURE ══════════════ -->
+  <div class="slide slide-content" id="s4">
+    <div class="label">Infrastructure</div>
+    <h2>How we ran the evals</h2>
+    <div class="cards" style="margin-bottom:20px;">
+      <div class="card green">
+        <div class="card-label">Inference</div>
+        <div class="card-value" style="font-size:26px;">Ollama</div>
+        <div class="card-desc">Local M2 Max · GGUF quantization · all 4 Falcon3 sizes + 5 baseline models.</div>
+      </div>
+      <div class="card highlight">
+        <div class="card-label">Eval Framework</div>
+        <div class="card-value" style="font-size:22px;">Inspect AI</div>
+        <div class="card-desc">AISI's open eval harness · WMDP is a built-in task · one command to run.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Scoring</div>
+        <div class="card-value" style="font-size:22px;">text-gen</div>
+        <div class="card-desc">multiple_choice() solver + robust_choice() scorer. Extracts A–D from generated text.</div>
+      </div>
+    </div>
+    <ul style="max-width:820px;">
+      <li>Quantization: Falcon3-1B = <strong>Q8_0</strong> (higher precision); all others = <strong>Q4_K_M</strong></li>
+      <li>Protocol: temperature=0.0 · seed=42 · max_tokens=32 · no system prompt <span class="dim">(matches WMDP paper protocol)</span></li>
+      <li>Wall time: 1B ≈ 1.2 min · 3B ≈ 2.1 min · 7B ≈ 6.1 min · 10B ≈ 7.8 min per full 1273-sample sweep</li>
+      <li><span class="bad">vLLM failed</span> (M2 = no NVIDIA GPU) · <span class="bad">hf-inference-providers failed</span> (Falcon3 not deployed there) · hf/ provider works but chat template conflicts → use ollama/ exclusively</li>
+    </ul>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 6 — SCALING RESULTS ══════════════ -->
+  <div class="slide slide-content" id="s5">
+    <div class="label">Results — Phase 2</div>
+    <h2>Falcon3 family: strong monotonic scaling</h2>
+    <table style="margin-bottom:14px; max-width:840px;">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Params</th>
+          <th>Quant</th>
+          <th>Accuracy</th>
+          <th>95% CI</th>
+          <th>Correct / 1273</th>
+          <th>Fmt-fail</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Falcon3-1B</td>
+          <td class="dim">1.7B</td>
+          <td><span class="warn" style="font-size:13px;">Q8_0 *</span></td>
+          <td class="acc-low">40.1%</td>
+          <td class="dim">37.5–42.9%</td>
+          <td class="dim">511</td>
+          <td class="dim">1 (0.1%)</td>
+          <td class="dim">1.2 min</td>
+        </tr>
+        <tr>
+          <td>Falcon3-3B</td>
+          <td class="dim">3.2B</td>
+          <td class="dim">Q4_K_M</td>
+          <td class="acc-mid">57.9%</td>
+          <td class="dim">55.2–60.6%</td>
+          <td class="dim">737</td>
+          <td class="dim">6 (0.5%)</td>
+          <td class="dim">2.1 min</td>
+        </tr>
+        <tr>
+          <td>Falcon3-7B</td>
+          <td class="dim">7.5B</td>
+          <td class="dim">Q4_K_M</td>
+          <td class="acc-high">70.9%</td>
+          <td class="dim">68.4–73.4%</td>
+          <td class="dim">903</td>
+          <td class="dim">1 (0.1%)</td>
+          <td class="dim">6.1 min</td>
+        </tr>
+        <tr>
+          <td><strong>Falcon3-10B</strong></td>
+          <td class="dim">10.3B</td>
+          <td class="dim">Q4_K_M</td>
+          <td class="acc-high"><strong>73.7%</strong></td>
+          <td class="dim">71.2–76.0%</td>
+          <td class="dim">938</td>
+          <td class="dim">0 (0.0%)</td>
+          <td class="dim">7.8 min</td>
+        </tr>
+      </tbody>
+    </table>
+    <ul style="max-width:840px;">
+      <li>Scaling gaps: <span class="good">+17.8pp</span> (1B→3B) · <span class="good">+13.0pp</span> (3B→7B) · <span class="warn">+2.8pp</span> (7B→10B) — diminishing returns at top end</li>
+      <li>Falcon3-10B (73.7%) approaches published Mixtral-8x7B (74.8%) logprob score at <strong>~4.5× fewer parameters</strong></li>
+      <li>Even Falcon3-1B is <strong>+15.1pp above random chance</strong> — real biosecurity knowledge even at 1.7B</li>
+    </ul>
+    <div class="warn-box">⚠ <strong>Quantization confound:</strong> Falcon3-1B runs Q8_0 vs Q4_K_M for 3B/7B/10B. 1B accuracy may be marginally inflated relative to a Q4_K_M equivalent — do not anchor scaling fits to the 1B point without this caveat.</div>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 7 — BASELINE COMPARISON ══════════ -->
+  <div class="slide slide-content" id="s6">
+    <div class="label">Results — Phase 3</div>
+    <h2>Falcon3-7B competitive with same-size SOTA</h2>
+    <table style="margin-bottom:14px; max-width:820px;">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Family</th>
+          <th>Params</th>
+          <th>Accuracy</th>
+          <th>95% CI</th>
+          <th>Fmt-fail</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Llama3.1-8B</td>
+          <td class="dim">Meta</td>
+          <td>8.0B</td>
+          <td class="acc-high">72.7%</td>
+          <td class="dim">70.2–75.1%</td>
+          <td class="dim">13 (1.0%)</td>
+        </tr>
+        <tr>
+          <td>Qwen2.5-7B</td>
+          <td class="dim">Alibaba</td>
+          <td>7.6B</td>
+          <td class="acc-high">71.6%</td>
+          <td class="dim">69.0–74.0%</td>
+          <td class="dim">0 (0.0%)</td>
+        </tr>
+        <tr>
+          <td><strong>Falcon3-7B</strong></td>
+          <td class="dim" style="color:#6c63ff;">TII</td>
+          <td>7.5B</td>
+          <td class="acc-high">70.9%</td>
+          <td class="dim">68.4–73.4%</td>
+          <td class="dim">1 (0.1%)</td>
+        </tr>
+        <tr>
+          <td>Mistral-7B <span class="tag tag-warn" style="font-size:10px; vertical-align:middle;">v0.3</span></td>
+          <td class="dim">Mistral AI</td>
+          <td>7.2B</td>
+          <td class="acc-mid">63.9%</td>
+          <td class="dim">61.2–66.5%</td>
+          <td class="dim">1 (0.1%)</td>
+        </tr>
+        <tr>
+          <td>Phi4-mini-3.8B</td>
+          <td class="dim">Microsoft</td>
+          <td>3.8B</td>
+          <td class="acc-mid">62.1%</td>
+          <td class="dim">59.4–64.7%</td>
+          <td class="dim">0 (0.0%)</td>
+        </tr>
+      </tbody>
+    </table>
+    <ul style="max-width:820px;">
+      <li>Top three (Llama3.1, Qwen2.5, Falcon3) cluster within <strong>1.8pp</strong> — CIs overlap fully, <span class="warn">no statistically significant differences</span> at n=1273</li>
+      <li>Phi4-mini-3.8B (62.1%) outperforms Falcon3-3B (57.9%) at a similar parameter count — strong efficiency for Microsoft's smaller model</li>
+    </ul>
+    <div class="warn-box">⚠ <strong>Mistral version:</strong> We ran v0.3 (63.9%). Mistral-7B is not actually evaluated in the WMDP paper — there is no primary-source baseline to compare against. Cannot make a published-vs-ours comparison for Mistral.</div>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 8 — ABLATIONS ══════════════════════ -->
+  <div class="slide slide-content" id="s7">
+    <div class="label">Results — Phase 4 Ablations · Falcon3-7B · n=1273</div>
+    <h2>Two strong ablation findings</h2>
+    <div class="two-col" style="max-width:900px;">
+      <div>
+        <div class="col-head">System Prompt Ablation</div>
+        <table style="font-size:14px; margin-bottom:10px;">
+          <thead>
+            <tr><th>Condition</th><th>Accuracy</th><th>Δ vs baseline</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>None (baseline)</td><td class="acc-high">70.9%</td><td class="dim">—</td></tr>
+            <tr><td>"You are a helpful assistant."</td><td class="acc-high">71.2%</td><td class="dim">+0.3pp</td></tr>
+            <tr><td>"You are a biosecurity researcher.<br>Refuse synthesis/weaponisation details."</td><td class="acc-high">70.5%</td><td class="dim">−0.4pp</td></tr>
+          </tbody>
+        </table>
+        <div class="info-box">
+          <div class="info-label">Null Result</div>
+          <p>All 95% CIs overlap completely. System prompts have <strong>no statistically significant effect</strong> on WMDP-bio accuracy. Parametric biosecurity knowledge is <strong>robust to surface-level instructional framing</strong> — you cannot reduce demonstrated capability by changing the prompt.</p>
+        </div>
+      </div>
+      <div>
+        <div class="col-head">Chain-of-Thought Ablation</div>
+        <table style="font-size:14px; margin-bottom:10px;">
+          <thead>
+            <tr><th>Condition</th><th>max_tokens</th><th>Accuracy</th><th>Fmt-fail</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Baseline (direct)</td><td class="dim">32</td><td class="acc-high">70.9%</td><td class="dim">0.1%</td></tr>
+            <tr>
+              <td><span class="bad">CoT — INVALID</span></td>
+              <td class="bad">32</td>
+              <td class="acc-bad">29.4%</td>
+              <td class="acc-bad">19.6%</td>
+            </tr>
+            <tr>
+              <td><strong>CoT — valid</strong></td>
+              <td class="dim">512</td>
+              <td class="acc-mid"><strong>42.9%</strong></td>
+              <td class="dim">0.3%</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="neg-box">
+          <div class="neg-label">Strong Negative: −28.0pp</div>
+          <p>Valid CoT (512 tok) drops accuracy from 70.9% → <strong>42.9%</strong>. Model reasons into wrong answers despite full token budget. 32-tok run is a truncation artifact (250 format failures confirm model was cut off mid-thought). Also 14× slower: 84.5 min vs 6.1 min.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 9 — METHODS LESSONS ════════════════ -->
+  <div class="slide slide-content" id="s8">
+    <div class="label">Methods</div>
+    <h2>Three critical protocol lessons</h2>
+    <ul style="max-width:820px; margin-bottom:20px;">
+      <li>
+        <strong>Chat template collision</strong> — Inspect's hf/ provider AND Falcon3's tokenizer both applied instruction formatting → double-wrapped prompts → <span class="bad">5–10% accuracy</span> (well below random chance)<br>
+        <span class="good">Fix: use ollama/ provider exclusively.</span> Ollama handles the chat template internally. <span class="dim">Always verify format_error rate before trusting accuracy numbers.</span>
+      </li>
+      <li>
+        <strong>Scoring method gap</strong> — Li et al. 2024 used logprob scoring (probability over the four answer tokens). We used text-gen + regex extraction. Text-gen scores are generally lower than logprob scores and are not directly comparable. <span class="warn">Our 70.9% ≠ Li et al.'s numbers — different protocol.</span><br>
+        <span class="dim">Interpret results within our cohort only (Falcon3 vs same-protocol baselines).</span>
+      </li>
+      <li>
+        <strong>CoT token budget</strong> — Setting max_tokens=32 with chain_of_thought() silently truncates reasoning mid-sentence. The model never outputs a final answer letter → 19.6% format failures → near-random 29.4% score. Always match token budget to prompt type. <span class="dim">This is not visible from accuracy alone — check format_error rate.</span>
+      </li>
+    </ul>
+    <div class="crux-box">
+      <div class="crux-label">Protocol hygiene</div>
+      <p>Anomalous results (below random, high format failures) almost always have a methodological explanation. Pilot at n=10, inspect raw outputs with <code style="color:#6c63ff">inspect view</code>, verify format_error rate before committing to 1,273-sample runs.</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 10 — PIPELINE STATUS ═══════════════ -->
+  <div class="slide slide-content" id="s9">
+    <div class="label">Research Direction</div>
+    <h2>The measure → mitigate pipeline</h2>
+    <div class="pipeline">
+      <div class="pipe-step done">
+        <div class="step-num">STEP 1 — DONE ✓</div>
+        <div class="step-name">Baseline Eval</div>
+        <div class="step-desc">4 Falcon3 + 5 baselines · ablations complete · scaling curve established</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step current">
+        <div class="step-num">STEP 2 — NOW</div>
+        <div class="step-name">Apply RMU</div>
+        <div class="step-desc">Representation Misdirection Unlearning on Falcon3-7B · target: 70.9% → ~25%</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="step-num">STEP 3</div>
+        <div class="step-name">Re-evaluate</div>
+        <div class="step-desc">Re-run WMDP-bio on unlearned model · verify MMLU preserved</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="step-num">STEP 4</div>
+        <div class="step-name">Report</div>
+        <div class="step-desc">First published Falcon3 biosecurity eval + unlearning demonstration</div>
+      </div>
+    </div>
+    <ul style="max-width:860px; margin-top:24px;">
+      <li><strong>RMU</strong> (Li et al., 2024): redirect hidden states toward a random vector on hazardous data while preserving benign representations. Proven to drop Llama 2-7B WMDP-bio from <strong>46% → ~25%</strong> while preserving MMLU</li>
+      <li>Grounded in <strong>Representation Engineering</strong> (Zou et al., 2023): high-level concepts are directions in the residual stream — RMU <em>misdirects</em> the biosecurity direction rather than zeroing it (more stable)</li>
+    </ul>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 11 — RMU METHOD ════════════════════ -->
+  <div class="slide slide-content" id="s10">
+    <div class="label">Machine Unlearning</div>
+    <h2>RMU: Representation Misdirection for Unlearning</h2>
+    <div class="two-col" style="max-width:900px;">
+      <div>
+        <div class="col-head">The method (Li et al. 2024)</div>
+        <ul style="max-width:420px;">
+          <li><strong>Forget loss:</strong> on hazardous data — push hidden states toward a random noise vector <em>r</em> (misdirect, not suppress)</li>
+          <li><strong>Retain loss:</strong> on benign data — keep hidden states close to the original model's representations</li>
+          <li><strong>Total loss:</strong> L = L_forget + α · L_retain where α balances forgetting vs. retention</li>
+          <li>Operates on a single intermediate layer · few training epochs · fast</li>
+        </ul>
+        <div class="info-box" style="margin-top:16px;">
+          <div class="info-label">Unlearning ≠ Refusal Training</div>
+          <p>Refusal adds a behavior-level block — circumventable by fine-tuning or jailbreaking. RMU degrades <strong>parametric knowledge at the representation level</strong> — harder to reverse. Our ablation showed system prompts can't touch the underlying capability; RMU operates one level deeper.</p>
+        </div>
+      </div>
+      <div>
+        <div class="col-head">Proof of concept — Llama 2-7B (Li et al. 2024, logprob eval)</div>
+        <table style="font-size:15px; margin-bottom:16px; max-width:400px;">
+          <thead>
+            <tr><th>Metric</th><th>Before RMU</th><th>After RMU</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>WMDP-bio</td><td class="acc-mid">46%</td><td class="acc-rand">~25% (random)</td></tr>
+            <tr><td>MMLU</td><td>46%</td><td>45% <span class="good">✓</span></td></tr>
+            <tr><td>MT-Bench</td><td>6.2</td><td>6.1 <span class="good">✓</span></td></tr>
+          </tbody>
+        </table>
+        <div class="result-box">
+          <div class="result-label">Our target for Falcon3-7B</div>
+          <p>Apply RMU and drop WMDP-bio from <strong>70.9% → ~25%</strong> while preserving MMLU (general capability). If successful: first published RMU unlearning result for any Falcon3 model.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ SLIDE 12 — RMU EXECUTION ═════════════════ -->
+  <div class="slide slide-content" id="s11">
+    <div class="label">Next Steps</div>
+    <h2>RMU execution plan for Falcon3-7B</h2>
+    <div class="two-col" style="max-width:900px;">
+      <div>
+        <div class="col-head">Execution steps</div>
+        <ul style="max-width:420px;">
+          <li><strong>Step 0 — Retain baseline:</strong> run MMLU on Falcon3-7B before RMU to establish the preserve metric</li>
+          <li><strong>Step 1 — Setup:</strong> clone WMDP repo (github.com/centerforaisafety/wmdp) · prepare forget set (bio corpora) + retain set (Wikitext / MMLU general)</li>
+          <li><strong>Step 2 — Train RMU:</strong> apply forget+retain loss on Falcon3-7B · target intermediate layer · few epochs · α calibration</li>
+          <li><strong>Step 3 — Re-evaluate:</strong> WMDP-bio (n=1273) + MMLU on unlearned model · same protocol as baseline</li>
+          <li><strong>Step 4 — Report:</strong> before/after delta table + MMLU preservation check</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-head">Open questions &amp; risks</div>
+        <ul style="max-width:420px;">
+          <li>Can M2 handle <span class="warn">7B backward pass?</span> Inference works; training (gradient checkpointing likely needed) is heavier</li>
+          <li>Which layer to target? WMDP paper used layer 7 of Llama 2-7B — Falcon3 architecture may differ</li>
+          <li>What α (retain weight) transfers? Paper: α=1200 for bio — needs calibration for Falcon3</li>
+          <li>Will 70.9% drop cleanly to ~25%? Pilot at n=200 first to check direction before full sweep</li>
+        </ul>
+        <div class="crux-box" style="margin-top:14px;">
+          <div class="crux-label">Fallback plan</div>
+          <p>If M2 can't run 7B RMU in reasonable time → fall back to <strong>Falcon3-3B</strong> (57.9% → ~25%). Smaller backward pass, same method, same story. The RMU demonstration is what matters, not the specific model size.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /deck -->
+
+<!-- Progress dots -->
+<div class="progress" id="progress"></div>
+
+<!-- Slide number -->
+<div class="slide-num" id="slideNum">1 / 12</div>
+
+<!-- Nav hint -->
+<div class="nav-hint">← → or click dots to navigate</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total = slides.length;
+  let current = 0;
+
+  // Initialize slide count
+  document.getElementById('slideNum').textContent = `1 / ${total}`;
+
+  // Build dots
+  const progress = document.getElementById('progress');
+  slides.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.addEventListener('click', () => goTo(i));
+    progress.appendChild(d);
+  });
+
+  function goTo(n) {
+    if (n < 0 || n >= total) return;
+    slides[current].classList.remove('active');
+    slides[current].classList.add('exit');
+    setTimeout(() => slides[current].classList.remove('exit'), 400);
+    current = n;
+    slides[current].classList.add('active');
+    // Update dots
+    document.querySelectorAll('.dot').forEach((d, i) => {
+      d.classList.toggle('active', i === current);
+    });
+    // Update slide number
+    document.getElementById('slideNum').textContent = `${current + 1} / ${total}`;
+    // Animate bars on slide 4 (index 3)
+    if (current === 3) animateBars();
+  }
+
+  function animateBars() {
+    document.querySelectorAll('.scale-bar').forEach(bar => {
+      const w = bar.style.width;
+      bar.style.width = '0';
+      setTimeout(() => bar.style.width = w, 50);
+    });
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') goTo(current + 1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                     goTo(current - 1);
+    if (e.key === 'Home') goTo(0);
+    if (e.key === 'End')  goTo(total - 1);
+  });
+
+  // Touch/swipe
+  let touchX = 0;
+  document.addEventListener('touchstart', e => touchX = e.touches[0].clientX);
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 50) goTo(current + (dx < 0 ? 1 : -1));
+  });
+</script>
+</body>
+</html>
